@@ -1,5 +1,9 @@
 Revision history for Perl extension POE::Component::Server::SimpleHTTP.
 
+* 1.16
+
+	Kwalitee fixes.
+
 * 1.15	
 
 	Changed SSLify to require instead of use.

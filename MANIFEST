@@ -18,3 +18,4 @@ META.yml
 README
 t/1_load.t
 t/2_pod.t
+t/3_pod_coverage.t
