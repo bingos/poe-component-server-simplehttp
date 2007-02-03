@@ -832,14 +832,20 @@ sub Request_Output {
             	
             	#
                $_[HEAP]->{'REQUESTS'}->{ $_ }->[0]->set_output_filter(POE::Filter::Stream->new() ) ;
-               $response->is_streaming();
+               $response->is_streaming(1);
             }
             
             if ( DEBUG ) {
          		print "Sending stream via ".$response->{STREAM}." to $_ with id $id \n" ;
          	}
             
-            $kernel->yield($response->{STREAM}, $_[HEAP]->{'REQUESTS'}->{ $_ }->[0],$_[HEAP]->{'REQUESTS'}->{ $id }->[3], $_[HEAP]->{'RESPONSES'}->{$_}, $_ );
+            $kernel->yield(
+               $response->{STREAM},                   # callback event
+               $_[HEAP]->{'REQUESTS'}->{ $_ }->[0],   # wheel
+               $_[HEAP]->{'REQUESTS'}->{ $id }->[3],  # request
+               $_[HEAP]->{'RESPONSES'}->{$_},         # response
+               $_                                     # id
+            );
    	}
    }
 	# Success!
