@@ -7,7 +7,7 @@ use warnings FATAL => 'all';				# Enable warnings to catch errors
 
 # Initialize our version
 # $Revision: 1181 $
-our $VERSION = '1.17';
+our $VERSION = '1.18';
 
 # Import what we need from the POE namespace
 use POE;
@@ -194,9 +194,24 @@ sub new {
 			croak( 'Unrecognized options were present in POE::Component::Server::SimpleHTTP->new -> ' . join( ', ', keys %opt ) );
 		}
 	}
+	
+	my $data = { 
+			'ALIAS'		=>	$ALIAS,
+			'ADDRESS'	=>	$ADDRESS,
+			'PORT'		=>	$PORT,
+			'HEADERS'	=>	$HEADERS,
+			'HOSTNAME'	=>	$HOSTNAME,
+			'HANDLERS'	=>	$HANDLERS,
+			'REQUESTS'	=>	{},
+			'RETRIES'	=>	0,
+			'SSLKEYCERT'	=>	$SSLKEYCERT,
+			'LOGHANDLER'    =>	$LOGHANDLER,
+	};
+
+	my $self = bless $data, $type;
 
 	# Create a new session for ourself
-	POE::Session->create(
+	$self->{SESSION_ID} = POE::Session->create(
 		# Our subroutines
 		'inline_states'	=>	{
 		   # Maintenance events
@@ -232,22 +247,24 @@ sub new {
 		},
 
 		# Set up the heap for ourself
-		'heap'		=>	{
-			'ALIAS'		=>	$ALIAS,
-			'ADDRESS'	=>	$ADDRESS,
-			'PORT'		=>	$PORT,
-			'HEADERS'	=>	$HEADERS,
-			'HOSTNAME'	=>	$HOSTNAME,
-			'HANDLERS'	=>	$HANDLERS,
-			'REQUESTS'	=>	{},
-			'RETRIES'	=>	0,
-			'SSLKEYCERT'	=>	$SSLKEYCERT,
-			'LOGHANDLER'    =>	$LOGHANDLER,
-		},
-	) or die 'Unable to create a new session!';
+		'heap'		=>	$self,
+	)->ID();
 
 	# Return success
-	return 1;
+	return $self;
+}
+
+sub session_id {
+  $_[0]->{SESSION_ID};
+}
+
+sub getsockname {
+  $_[0]->{SOCKETFACTORY}->getsockname;
+}
+
+sub shutdown {
+  my $self = shift;
+  $poe_kernel->call( $self->{SESSION_ID}, 'SHUTDOWN', @_ );
 }
 
 # This subroutine, when SimpleHTTP exits, will search for leaks
@@ -268,6 +285,8 @@ sub StartServer {
 	if ( DEBUG ) {
 		warn 'Starting up SimpleHTTP now';
 	}
+
+	$_[HEAP]->{SESSION_ID} = $_[SESSION]->ID();
 
 	# Register an alias for ourself
 	$_[KERNEL]->alias_set( $_[HEAP]->{'ALIAS'} );
