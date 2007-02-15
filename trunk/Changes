@@ -1,0 +1,61 @@
+========================
+2007-02-15 14:47:56 1.17
+========================
+
+  2007-02-15 14:46:02 (r10) by bingos; t/4_test_kwalitee.t A
+
+    Added kwalitee test. 
+
+  2007-02-15 14:45:34 (r9) by bingos
+  tools A; Changes.old A; lib/POE/Component/Server/SimpleHTTP.pm M;
+  META.yml D; MANIFEST M; tools/svn-log.perl A; Changes R
+
+    Added LOGHANDLER directive for general logging duties. Deprecated the
+    Changes to Changes.old, added svn logging for the future Changes
+    file. 
+
+  2007-02-05 21:36:44 (r8) by eriam
+  lib/POE/Component/Server/SimpleHTTP/Response.pm M
+
+    ! is_streaming
+
+  2007-02-03 19:02:35 (r7) by eriam
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    + is_streaming needs a 1 to be initialized
+
+  2007-02-03 19:01:03 (r6) by eriam
+  lib/POE/Component/Server/SimpleHTTP/Response.pm M
+
+    ! is_streaming can now be used to test if a response is actually in
+    streaming mode
+
+========================
+2007-01-29 15:13:13 1.16
+========================
+
+  2007-01-29 15:07:26 (r4) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; MANIFEST M; Changes M; inc D
+
+    Kwalitee fixes
+
+  2007-01-19 16:10:20 (r1) by svn
+  README A; inc/Module A; /trunk A; lib/POE/Component/Server A;
+  inc/Module/Install/WriteAll.pm A; t A;
+  lib/POE/Component/Server/SimpleHTTP/Response.pm A; t/1_load.t A;
+  lib/POE/Component/Server/SimpleHTTP.pm A; t/2_pod.t A; inc A;
+  lib/POE/Component/Server/SimpleHTTP/PreFork.pm A; examples A;
+  inc/Module/Install.pm A; /branches A;
+  lib/POE/Component/Server/SimpleHTTP A; lib/POE/Component A;
+  inc/Module/Install/Makefile.pm A; examples/server.pl A;
+  inc/Module/Install/Metadata.pm A;
+  lib/POE/Component/Server/SimpleHTTP/Connection.pm A; inc/Module/Install
+  A; lib A; MANIFEST A; Changes A; inc/Module/Install/Fetch.pm A;
+  inc/Module/Install/Can.pm A; inc/Module/Install/Win32.pm A; META.yml A;
+  Makefile.PL A; lib/POE A; inc/Module/Install/Base.pm A; /tags A
+
+    Initial repository layout
+
+==============
+End of Excerpt
+==============

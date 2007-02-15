@@ -1,0 +1,24 @@
+Changes
+examples/server.pl
+inc/Module/Install.pm
+inc/Module/Install/Base.pm
+inc/Module/Install/Can.pm
+inc/Module/Install/Fetch.pm
+inc/Module/Install/Makefile.pm
+inc/Module/Install/Metadata.pm
+inc/Module/Install/Win32.pm
+inc/Module/Install/WriteAll.pm
+lib/POE/Component/Server/SimpleHTTP.pm
+lib/POE/Component/Server/SimpleHTTP/Connection.pm
+lib/POE/Component/Server/SimpleHTTP/PreFork.pm
+lib/POE/Component/Server/SimpleHTTP/Response.pm
+Makefile.PL
+MANIFEST			This list of files
+META.yml
+README
+t/1_load.t
+t/2_pod.t
+t/3_pod_coverage.t
+t/4_test_kwalitee.t
+t/5_run.t
+tools/svn-log.perl
