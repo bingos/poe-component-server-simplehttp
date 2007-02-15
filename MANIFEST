@@ -20,4 +20,5 @@ t/1_load.t
 t/2_pod.t
 t/3_pod_coverage.t
 t/4_test_kwalitee.t
+t/5_run.t
 tools/svn-log.perl
