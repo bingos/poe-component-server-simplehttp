@@ -695,6 +695,10 @@ sub Got_Input {
 						$response,
 						$handler->{'DIR'},
 			);
+            # Make sure we croak if we have an issue posting
+			croak("I had a problem posting to event $handler->{'EVENT'} of session $handler->{'SESSION'} for DIR handler '$handler->{'DIR'}'",
+			      ". As reported by Kernel: '$!', perhaps the session name is spelled incorrectly for this handler?")
+                if $!;
 
 			# All done!
 			return;
