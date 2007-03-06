@@ -1,7 +1,8 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 12;
+use Test::More tests => 14;
+#use Test::More 'no_plan';
 
 use LWP::UserAgent;
 use LWP::ConnCache;
@@ -55,6 +56,13 @@ if ($pid)  # we are parent
        "get text/html");
     $content=$resp->content;
     ok($content =~ /my friend/, 'my friend');
+    
+    # Test for 404
+    diag('Test for 404');
+    $req=HTTP::Request->new(GET => "http://$IP:$PORT/wedonthaveone");
+    $resp=$UA->request($req);
+    
+    is($resp->code, 404, "404 code returned from bad handler call, this is good.");
 
     unless ($UA->conn_cache) {
         diag( "Enabling Keep-Alive and going again" );
@@ -73,22 +81,22 @@ else  # we are the child
                 'HOSTNAME'      =>      'pocosimpletest.com',
                 'HANDLERS'      =>      [
                         {
-                                'DIR'           =>      '/honk/',
+                                'DIR'           =>      '^/honk/',
                                 'SESSION'       =>      'HTTP_GET',
                                 'EVENT'         =>      'HONK',
                         },
                         {
-                                'DIR'           =>      '/bonk/zip.html',
+                                'DIR'           =>      '^/bonk/zip.html',
                                 'SESSION'       =>      'HTTP_GET',
                                 'EVENT'         =>      'BONK2',
                         },
                         {
-                                'DIR'           =>      '/bonk/',
+                                'DIR'           =>      '^/bonk/',
                                 'SESSION'       =>      'HTTP_GET',
                                 'EVENT'         =>      'BONK',
                         },
                         {
-                                'DIR'           =>      '/',
+                                'DIR'           =>      '^/$',
                                 'SESSION'       =>      'HTTP_GET',
                                 'EVENT'         =>      'TOP',
                         },

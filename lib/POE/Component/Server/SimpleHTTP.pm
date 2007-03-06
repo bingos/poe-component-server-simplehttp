@@ -676,7 +676,9 @@ sub Got_Input {
 	# Add this response to the wheel
 	$_[HEAP]->{'REQUESTS'}->{ $id }->[2] = $response;
 	$_[HEAP]->{'REQUESTS'}->{ $id }->[3] = $request;
-
+	
+    # TODO we will have to check this call to the log handler so we don't get a hanging
+    # situation like below.
 	$_[KERNEL]->post(
 	   $_[HEAP]->{'LOGHANDLER'}->{'SESSION'},
 	   $_[HEAP]->{'LOGHANDLER'}->{'EVENT'},
@@ -706,7 +708,10 @@ sub Got_Input {
 	}
 
 	# If we reached here, no handler was able to handle it...
-	die 'No handler was able to handle ' . $path;
+	# Set response code to 404 and tell the client we didn't find anything
+	$response->code( 404 );
+	$response->content('404 Not Found');
+	$_[KERNEL]->yield('DONE', $response);
 }
 
 # Finished with a request!
@@ -1172,7 +1177,7 @@ NOTE: The path is UNIX style, not MSWIN style ( /blah/foo not \blah\foo )
 
 Now, if you supply 100 handlers, how will SimpleHTTP know what to do? Simple! By passing in an array in the first place,
 you have already told SimpleHTTP the order of your handlers. They will be tried in order, and if a match is not found,
-SimpleHTTP will DIE!
+SimpleHTTP will return a 404 response.
 
 This allows some cool things like specifying 3 handlers with DIR of:
 '^/foo/.*', '^/$', '.*'
