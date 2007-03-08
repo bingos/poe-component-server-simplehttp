@@ -1108,8 +1108,14 @@ POE::Component::Server::SimpleHTTP - Perl extension to serve HTTP requests in PO
 		my ($request, $remote_ip) = @_[ARG0,ARG1];
 
 		# Do some sort of logging activity.
-
+		# If the request was malformed, $request = undef
+		# CHECK FOR A REQUEST OBJECT BEFORE USING IT.
+        if( $request ) {
+        {
        		warn join(' ', time(), $remote_ip, $request->uri ), "\n";
+        } else {
+       		warn join(' ', time(), $remote_ip, 'Bad request' ), "\n";
+        }
 
 		return;
 	}
@@ -1231,11 +1237,12 @@ SESSION	->	The session to send the input
 
 EVENT	->	The event to trigger
 
-You will receive an event for each request to the server from clients.
+You will receive an event for each request to the server from clients.  Malformed client requests will not be passed into the handler.  Instead
+undef will be passed.
 
 The event will have the following parameters:
 
-ARG0 -> HTTP::Request object
+ARG0 -> HTTP::Request object/undef if client request was malformed.
 
 ARG1 -> the IP address of the client
 
