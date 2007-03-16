@@ -827,9 +827,15 @@ sub Request_Output {
    if (defined $response->{'STREAM'}) {
       # Keep track if we plan to stream ...   	
    	if ( $_[HEAP]->{'RESPONSES'}->{ $id } ) {
+   	   if ( DEBUG ) {
+   	      warn "Restoring response from HEAP and id $id ";
+   	   }
    		$response = $_[HEAP]->{'RESPONSES'}->{ $id };
    	}
    	else {
+   	   if ( DEBUG ) {
+   	      warn "Saving HEAP response to id $id ";
+   	   }
          $_[HEAP]->{'RESPONSES'}->{ $id } = $response;
       }
    }
@@ -894,28 +900,51 @@ sub Request_Output {
       # Loops through current streams
       foreach (keys %{ $_[HEAP]->{'RESPONSES'} }) {
 
+         # Preliminary check
+      	if ( ! defined $_[HEAP]->{'REQUESTS'}->{ $_ }->[0] 
+      	      or ! defined $_[HEAP]->{'REQUESTS'}->{ $_ }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
+      		if ( DEBUG ) {
+      			warn 'Tried to send data over a closed/nonexistant socket!';
+      		}
+      		next;
+      	}
    	
-            # Sets the correct POE::Filter
-            unless (defined $response->{'IS_STREAMING'}) {
-            	# Mark this socket done
-            	$_[HEAP]->{'REQUESTS'}->{ $id }->[1] = 2;
-            	
-            	#
-               $_[HEAP]->{'REQUESTS'}->{ $_ }->[0]->set_output_filter(POE::Filter::Stream->new() ) ;
-               $response->is_streaming(1);
-            }
-            
-            if ( DEBUG ) {
-         		print "Sending stream via ".$response->{STREAM}." to $_ with id $id \n" ;
-         	}
-            
-            $kernel->yield(
+         # Sets the correct POE::Filter
+         unless (defined $response->{'IS_STREAMING'}) {
+         	# Mark this socket done
+         	$_[HEAP]->{'REQUESTS'}->{ $id }->[1] = 2;
+         	
+         	#
+            $_[HEAP]->{'REQUESTS'}->{ $_ }->[0]->set_output_filter(POE::Filter::Stream->new() ) ;
+            $response->is_streaming(1);
+         }
+         
+         if ( DEBUG ) {
+      		print "Sending stream via ".$response->{STREAM_SESSION}."/".$response->{STREAM}." to $_ with id $id \n" ;
+      	}
+         
+         # we send the event to stream with wheels request and response to the session 
+         # that has registered the streaming event (can be our own session ? it is left
+         # it because initially it was a simple $kernel->post)            
+   	   if (defined $response->{STREAM_SESSION}) {
+            POE::Kernel->post(
+               $response->{STREAM_SESSION},           # callback session
                $response->{STREAM},                   # callback event
                $_[HEAP]->{'REQUESTS'}->{ $_ }->[0],   # wheel
                $_[HEAP]->{'REQUESTS'}->{ $id }->[3],  # request
                $_[HEAP]->{'RESPONSES'}->{$_},         # response
                $_                                     # id
-            );
+            );  
+         }
+         else {
+            POE::Kernel->post(
+               $response->{STREAM},                   # callback event
+               $_[HEAP]->{'REQUESTS'}->{ $_ }->[0],   # wheel
+               $_[HEAP]->{'REQUESTS'}->{ $id }->[3],  # request
+               $_[HEAP]->{'RESPONSES'}->{$_},         # response
+               $_                                     # id
+            );  
+         }
    	}
    }
 	# Success!
