@@ -923,6 +923,13 @@ sub Request_Output {
       		print "Sending stream via ".$response->{STREAM_SESSION}."/".$response->{STREAM}." to $_ with id $id \n" ;
       	}
          
+         my %stream = (
+            wheel    => $_[HEAP]->{'REQUESTS'}->{ $_ }->[0],  # wheel
+            request  => $_[HEAP]->{'REQUESTS'}->{ $id }->[3],  # request
+            response => $_[HEAP]->{'RESPONSES'}->{$_},         # response
+            id       => $_                                     # id
+         );
+         
          # we send the event to stream with wheels request and response to the session 
          # that has registered the streaming event (can be our own session ? it is left
          # it because initially it was a simple $kernel->post)            
@@ -930,19 +937,13 @@ sub Request_Output {
             POE::Kernel->post(
                $response->{STREAM_SESSION},           # callback session
                $response->{STREAM},                   # callback event
-               $_[HEAP]->{'REQUESTS'}->{ $_ }->[0],   # wheel
-               $_[HEAP]->{'REQUESTS'}->{ $id }->[3],  # request
-               $_[HEAP]->{'RESPONSES'}->{$_},         # response
-               $_                                     # id
+               \%stream
             );  
          }
          else {
             POE::Kernel->post(
                $response->{STREAM},                   # callback event
-               $_[HEAP]->{'REQUESTS'}->{ $_ }->[0],   # wheel
-               $_[HEAP]->{'REQUESTS'}->{ $id }->[3],  # request
-               $_[HEAP]->{'RESPONSES'}->{$_},         # response
-               $_                                     # id
+               \%stream
             );  
          }
    	}
@@ -1286,7 +1287,7 @@ Again, this will automatically turn every incoming connection into a SSL socket.
 
 =head2 Events
 
-SimpleHTTP is so simple, there are only 7 events available.
+SimpleHTTP is so simple, there are only 8 events available.
 
 =over 4
 
@@ -1344,6 +1345,39 @@ SimpleHTTP is so simple, there are only 7 events available.
 		Waits for all pending requests to come in via DONE/CLOSE, then removes it's alias
 
 =back
+
+=head2 Streaming with SimpleHTTP
+
+It's now possible to send data as a stream to clients (unbuffered and integrated in the 
+POE loop).
+
+Just create your sessions as usually and add a streaming event, this event will be triggered
+each time you set the $response to a streaming state:
+
+   # sets the response as streamed within our session with the stream event
+   $response->stream(
+      session  => 'HTTP_GET',
+      event    => 'GOT_STREAM'
+   );   
+
+This will call the GOT_STREAM event of the HTTP_GET session with as first arg (ARG0) bundled
+within a hash the wheel, request, response and id.
+
+You can now send data by chunks and either call yourself back (via POE) or shutdown when your 
+streaming is done (EOF for example).
+
+   sub GOT_STREAM {
+      my ( $kernel, $heap, $stream ) = @_[KERNEL, HEAP, ARG0];
+      
+      # $stream contains the wheel, the request, the response 
+      # and an id associated the the wheel
+      $stream->{'wheel'}->put("Hello World\n");
+   
+      # lets go on streaming ... with some delay actually but
+      # that should be a post unless the client needs the data
+      # slowly ..
+      POE::Kernel->delay('GOT_STREAM', 1, $stream );
+   }
 
 =head2 SimpleHTTP Notes
 
