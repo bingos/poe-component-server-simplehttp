@@ -7,7 +7,7 @@ use warnings FATAL => 'all';				# Enable warnings to catch errors
 
 # Initialize our version
 # $Revision: 1181 $
-our $VERSION = '1.22';
+our $VERSION = '1.23';
 
 # Import what we need from the POE namespace
 use POE;
