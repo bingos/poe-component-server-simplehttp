@@ -1,4 +1,29 @@
 ========================
+2007-03-15 19:36:38 1.21
+========================
+
+  2007-03-15 19:35:12 (r24) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Bumped the version number for release
+
+  2007-03-08 14:27:26 (r23) by avinash240
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Updated POD in regards to the Log Handler session and how its
+    arguments changed based on malformed client requests.
+
+  2007-03-08 04:29:40 (r22) by avinash240
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Server now handles malformed requests better. Will not try to
+    dispatch to a handler when receiving a malformed request.
+
+  2007-03-06 09:25:04 (r21) by bingos; Changes M
+
+    Changes updated from release. 
+
+========================
 2007-03-06 09:17:46 1.20
 ========================
 

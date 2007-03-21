@@ -1,5 +1,6 @@
 Changes
 examples/server.pl
+examples/stream.pl
 inc/Module/Install.pm
 inc/Module/Install/Base.pm
 inc/Module/Install/Can.pm
@@ -21,4 +22,5 @@ t/2_pod.t
 t/3_pod_coverage.t
 t/4_test_kwalitee.t
 t/5_run.t
+t/6_stream.t
 tools/svn-log.perl
