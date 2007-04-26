@@ -1,14 +1,13 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 11;
+use Test::More tests => 3;
 
 use HTTP::Request;
 use POE;
 use POE::Kernel;
 use POE::Component::Client::HTTP;
 use POE::Component::Server::SimpleHTTP;
-
 
 my $PORT = 2080;
 my $IP = "localhost";
@@ -55,7 +54,7 @@ if ($pid)  # we are parent
    
       my $request = HTTP::Request->new(GET => "http://$IP:$PORT/");
       
-      diag('Test a stream of 10 helloworlds ..');
+      diag('Test a stream of 2 helloworlds ..');
       POE::Kernel->post('ua', 'request', 'response', $request);
       
    }
@@ -78,9 +77,9 @@ if ($pid)  # we are parent
       
        ok($data =~ /Hello World/, 'Hello World');
    
-      if ($heap->{'count'} == 10) {
+      if ($heap->{'count'} == 2) {
          
-         is($heap->{'count'}, 10, "Got 10 chuncks ... all good :)");
+         is($heap->{'count'}, 2, "Got 2 streamed helloworlds ... all good :)");
          exit;
       }
    }
@@ -133,35 +132,35 @@ sub GOT_MAIN {
    print "# GOT_MAIN \n";
    # sets the response as streamed within our session with the stream event
    $response->stream(
-      session  => 'HTTP_GET',
-      event    => 'GOT_STREAM'
+      session     => 'HTTP_GET',
+      event       => 'GOT_STREAM'
    );   
 
-   $heap->{'count'} ||= 10;
+   $heap->{'count'} ||= 2;
    
 	# We are done!
 	POE::Kernel->post( 'HTTPD', 'DONE', $response );
 }
 
 sub GOT_STREAM {
-   my ( $kernel, $heap, $stream ) = @_[KERNEL, HEAP, ARG0];
+   my ( $kernel, $heap, $response ) = @_[KERNEL, HEAP, ARG0];
 
    # lets go on streaming ...
    if ($heap->{'count'} >= 0) {
       
-      $stream->{'wheel'}->put("Hello World\n");
-      $heap->{'count'}--;
+      $response->content("Hello World\n");
       
-      POE::Kernel->delay('GOT_STREAM', 1, $stream );
+      $heap->{'count'}--;
+      POE::Kernel->post('HTTPD', 'PUSH', $response);
    }
    else {
-      POE::Kernel->post('HTTPD', 'CLOSE', $stream->{'response'} );
+      POE::Kernel->post('HTTPD', 'CLOSE', $response );
    }
 }
 
 sub keepalive { 
    my ( $heap ) = @_[HEAP];
 
-   $_[KERNEL]->delay_set('keepalive',3);
+   $_[KERNEL]->delay_set('keepalive', 1);
 }
 
