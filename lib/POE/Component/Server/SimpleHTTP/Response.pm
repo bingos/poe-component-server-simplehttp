@@ -60,16 +60,12 @@ sub stream {
    
    no strict 'refs';
    
-   if ($opt{'event'} ne '') {
+   if ($opt{event} ne '') {
       $self->{'STREAM_SESSION'}  = $opt{'session'} || undef;
       $self->{'STREAM'}          = $opt{'event'};
    }
    else {
       $self->{'STREAM'} = shift;
-   }
-   
-   if (defined $opt{'dont_flush'}) {
-      $self->{'dont_flush'}  = 1;
    }
 }
 
