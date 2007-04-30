@@ -34,7 +34,7 @@ if ($pid)  # we are parent
     my $ua = LWP::UserAgent->new();
     my $request = HTTP::Request->new( GEt => "http://$IP:$PORT/hello.html");
     my $resp = $ua->request( $request );
-    is( $resp->code, 400, 'Good, got back response with correct error code from bad request.' );
+    is( $resp->code, 200, 'Good, got back response with correct error code from bad request.' );
     diag( $resp->content );
 }
 
