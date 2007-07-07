@@ -56,7 +56,7 @@ sub new {
 	# Our own options
 	my ( $ALIAS, $ADDRESS, $PORT, $HOSTNAME, $HEADERS, $HANDLERS, $SSLKEYCERT );
 	# options for pre-forking
-	my ( $FORKHANDLERS, $STARTSERVERS, $MINSPARESERVERS, $MAXSPARESERVERS, $MAXCLIENTS );
+	my ( $FORKHANDLERS, $STARTSERVERS, $MINSPARESERVERS, $MAXSPARESERVERS, $MAXCLIENTS, $MAXREQUESTPERCHILD );
 
 	# You could say I should do this: $Stuff = delete $opt{'Stuff'}
 	# But, that kind of behavior is not defined, so I would not trust it...
@@ -245,6 +245,16 @@ sub new {
 		}
 	}
 
+	# Get the MAXREQUESTPERCHILD
+	if (exists $opt{'MAXREQUESTPERCHILD'} and defined $opt{'MAXREQUESTPERCHILD'} ) {
+		$MAXREQUESTPERCHILD = int $opt{'MAXREQUESTPERCHILD'};
+		delete $opt{'MAXREQUESTPERCHILD'};
+
+		if ( $MAXREQUESTPERCHILD <= 0 ) {
+			croak( 'MAXREQUESTPERCHILD must be greater than 0!' );
+		}
+	}
+        
 	# Get the STARTSERVERS
 	if (exists $opt{'STARTSERVERS'} and defined $opt{'STARTSERVERS'} ) {
 		$STARTSERVERS = int $opt{'STARTSERVERS'};
@@ -320,6 +330,9 @@ sub new {
 
 			# Send output to connection!
 			'DONE'		=>	\&POE::Component::Server::SimpleHTTP::Request_Output,
+                        
+			# Stream output to connection!
+			'STREAM'	   =>	\&POE::Component::Server::SimpleHTTP::Stream_Output,
 
 			# Kill the connection!
 			'CLOSE'		=>	\&Request_Close,
@@ -340,6 +353,7 @@ sub new {
 			'MAXSPARESERVERS'	=>	$MAXSPARESERVERS,
 			'MAXCLIENTS'		=>	$MAXCLIENTS,
 			'STARTSERVERS'		=>	$STARTSERVERS,
+			'MAXREQUESTPERCHILD'	=>	$MAXREQUESTPERCHILD,
 			'ISCHILD'		=>	0,
 			'FORKHANDLERS'		=>	$FORKHANDLERS,
 			'SCOREBOARD'		=>	undef
@@ -394,20 +408,25 @@ sub StopServer {
 			if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
 				warn 'Stopped SimpleHTTP gracefully, no requests left';
 			}
+            
 		}
 
 		# All done!
 		return 1;
 	}
-
-	# Forcefully kill all the children.
+    
+    # CheckSpares need to know that we're shutting down
+    $_[HEAP]->{'SCOREBOARD'}->{'shutdown'} = 1;
+	
+    # Forcefully kill all the children.
 		$_[KERNEL]->call( $_[SESSION], 'KillChildren', 'KILL' );
 
 		# Forcibly close all sockets that are open
 		foreach my $conn ( keys %{ $_[HEAP]->{'REQUESTS'} } ) {
 			# Can't call method "shutdown_input" on an undefined value at
 			# /usr/lib/perl5/site_perl/5.8.2/POE/Component/Server/SimpleHTTP.pm line 323.
-			if ( defined $_[HEAP]->{'REQUESTS'}->{ $conn }->[0] and defined $_[HEAP]->{'REQUESTS'}->{ $conn }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
+			if ( defined $_[HEAP]->{'REQUESTS'}->{ $conn }->[0] 
+                and defined $_[HEAP]->{'REQUESTS'}->{ $conn }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
 				$_[HEAP]->{'REQUESTS'}->{ $conn }->[0]->shutdown_input;
 				$_[HEAP]->{'REQUESTS'}->{ $conn }->[0]->shutdown_output;
 			}
@@ -472,6 +491,9 @@ sub KillChildren {
 			}
 		}
 	}
+
+	# 
+	$_[KERNEL]->delay_set('CheckSpares');
 
 	return $children;
 }
@@ -635,8 +657,20 @@ sub CheckSpares {
 		return 1;
 	}
 
+
 	# Retrieve the shared memory variable.
 	$scoreboard = $heap->{'SCOREBOARD'};
+
+    # in the test for maxrequestperchild the only 
+    # way to have CheckSpare aware that we're shutting down
+    # is using this shared variable
+    if (defined $scoreboard->{'shutdown'}) {
+        if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
+            warn 'Shutdown in progress, checkspare is useless';
+        }
+        return 1;
+    }
+
 	$mem = tied %$scoreboard if defined $scoreboard;
 	if ( not defined $mem ) {
 		warn 'SCOREBOARD is not tied! Aborting.';
@@ -1013,6 +1047,21 @@ sub Got_Flush {
 	# Call the super class method.
 	my $rv = POE::Component::Server::SimpleHTTP::Got_Flush( @_ );
 
+	# Deal with maxrequestperchild
+	if ( $_[HEAP]->{'ISCHILD'} && defined $_[HEAP]->{'MAXREQUESTPERCHILD'}) {
+                $_[HEAP]->{'REQUESTCOUNT'}++;
+                
+                if ($_[HEAP]->{'REQUESTCOUNT'} >= $_[HEAP]->{'MAXREQUESTPERCHILD'}) {
+                  
+                  if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
+                          warn "Shutting down $$ because it reached MAXREQUESTPERCHILD.";
+                  }
+                  
+                  $_[KERNEL]->yield( 'SHUTDOWN', 'GRACEFUL' );
+                  return 1;
+               }
+	}
+        
 	# If the connection died/failed for some reason then the request is deleted.
 	# In this case, we have to update the scoreboard.
 	if ( not exists $_[HEAP]->{'REQUESTS'}->{ $id } ) {

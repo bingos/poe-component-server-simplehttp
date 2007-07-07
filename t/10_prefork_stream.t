@@ -1,13 +1,13 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 3;
+use Test::More tests => 4;
 
 use HTTP::Request;
 use POE;
 use POE::Kernel;
 use POE::Component::Client::HTTP;
-use POE::Component::Server::SimpleHTTP;
+use POE::Component::Server::SimpleHTTP::PreFork;
 
 my $PORT = 2080;
 my $IP = "localhost";
@@ -35,6 +35,7 @@ if ($pid)  # we are parent
 	my $states = {
 	  _start    => \&_start,
 	  response  => \&response,
+      quit      => \&quit,
 	};
 		
    POE::Session->create( inline_states => $states );
@@ -49,7 +50,7 @@ if ($pid)  # we are parent
          Alias     => 'ua',
          Protocol  => 'HTTP/1.1', 
          From      => 'test@tester',
-         Streaming => 100,
+         Streaming => 50,
       );
    
       my $request = HTTP::Request->new(GET => "http://$IP:$PORT/");
@@ -58,6 +59,10 @@ if ($pid)  # we are parent
       POE::Kernel->post('ua', 'request', 'response', $request);
    }
    
+    sub quit {
+        exit;
+    }
+
    sub response {
       my ( $kernel, $heap, $session, $request_packet, $response_packet ) 
          = @_[KERNEL, HEAP, SESSION, ARG0, ARG1];
@@ -68,25 +73,18 @@ if ($pid)  # we are parent
       my $request  = $request_packet->[0];
       my $response = $response_packet->[0];
       
-      # the PoCoClientHTTP sends the first chunk in the content
-      # of the http response
-      #if ($heap->{'count'} == 1) {
-      #   my $data = $response->content;
-      #   chomp($data);
-#print $data."\n";
-       #  ok($data =~ /Hello World 0/, "First one as response content received");
-      #}
-      
       # then all streamed data in the second element of the response
       # array ...
       my ($resp, $data) = @$response_packet;
       chomp($data);
-      
-      ok($data =~ /Hello World/, "Received a hello");
-  
+ #     print $data."\n";
+      ok($data =~ /Hello World/, "Received a hello")
+        if $heap->{'count'} <= 2;
+   
       if ($heap->{'count'} == 2) {
          is($heap->{'count'}, 2, "Got 3 streamed helloworlds ... all good :)");
-         exit;
+         #exit;
+         $kernel->delay_set('quit', 3);
       }
       $heap->{'count'}++;
    }
@@ -97,7 +95,7 @@ if ($pid)  # we are parent
 ####################################################################
 else  # we are the child
 {                          
-    POE::Component::Server::SimpleHTTP->new(
+    POE::Component::Server::SimpleHTTP::PreFork->new(
                 'ALIAS'         =>      'HTTPD',
                 'ADDRESS'       =>      "$IP",
                 'PORT'          =>      $PORT,
@@ -109,6 +107,11 @@ else  # we are the child
                			'EVENT'		=>	'GOT_MAIN',
                		},
                 ],
+                'FORKHANDLERS'          =>      { 'HTTP_GET' => 'FORKED' },
+                'MINSPARESERVERS'       =>      1,
+                'MAXSPARESERVERS'       =>      3,
+                'MAXCLIENTS'            =>      256,
+                'STARTSERVERS'          =>      1,
     );
     # Create our own session to receive events from SimpleHTTP
     POE::Session->create(
@@ -120,6 +123,7 @@ else  # we are the child
                   		'GOT_MAIN'	   =>	\&GOT_MAIN,
                   		'GOT_STREAM'	=>	\&GOT_STREAM,
 		                  keepalive      => \&keepalive,
+                        'quit'          => \&quit,
                 },   
     );
     
@@ -149,21 +153,27 @@ sub GOT_MAIN {
    $kernel->yield('GOT_STREAM', $response);
 }
 
+sub quit {
+    POE::Kernel->call('HTTPD', 'SHUTDOWN');
+    exit;
+}
+
 sub GOT_STREAM {
    my ( $kernel, $heap, $response ) = @_[KERNEL, HEAP, ARG0];
 
    # lets go on streaming ...
    if ($heap->{'count'} <= 2) {
       my $text = "Hello World ".$heap->{'count'}." \n";
-      #print "send ".$text."\n";
+    #  print "send ".$text."\n";
       $response->content($text);
       
       $heap->{'count'}++;
       POE::Kernel->post('HTTPD', 'STREAM', $response);
    }
-   else {
+    else {
       POE::Kernel->post('HTTPD', 'CLOSE', $response );
-   }
+        $kernel->delay_set('quit', 1);
+    }
 }
 
 sub keepalive { 

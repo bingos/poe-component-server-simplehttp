@@ -1,13 +1,14 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 3;
+use Test::More tests => 2;
 
 use HTTP::Request;
 use POE;
 use POE::Kernel;
 use POE::Component::Client::HTTP;
-use POE::Component::Server::SimpleHTTP;
+use POE::Component::Server::SimpleHTTP::PreFork;
+use IPC::Shareable;
 
 my $PORT = 2080;
 my $IP = "localhost";
@@ -20,6 +21,15 @@ END {
         kill 2, $pid or warn "Unable to kill $pid: $!";
     }
 }
+
+my %options = (
+   create      => 'yes',
+   exclusive   => 0,
+   mode        => 0644,
+);
+
+my %test;
+tie %test, 'IPC::Shareable', 'data', {%options};
 
 ####################################################################
 if ($pid)  # we are parent
@@ -35,6 +45,7 @@ if ($pid)  # we are parent
 	my $states = {
 	  _start    => \&_start,
 	  response  => \&response,
+      quit		=> \&quit,
 	};
 		
    POE::Session->create( inline_states => $states );
@@ -49,46 +60,46 @@ if ($pid)  # we are parent
          Alias     => 'ua',
          Protocol  => 'HTTP/1.1', 
          From      => 'test@tester',
-         Streaming => 100,
       );
    
       my $request = HTTP::Request->new(GET => "http://$IP:$PORT/");
       
-      diag('Test a stream of 3 helloworlds ..');
+      $heap->{count} = 0;
+      
+      diag('Test maxrequestperchild ..');
       POE::Kernel->post('ua', 'request', 'response', $request);
    }
    
+   sub quit {
+       # print "Trying to shudown the server \n";
+       # POE::Kernel->post('HTTPD', 'SHUTDOWN');
+       exit;
+    }
+
    sub response {
       my ( $kernel, $heap, $session, $request_packet, $response_packet ) 
          = @_[KERNEL, HEAP, SESSION, ARG0, ARG1];
    
       my $return;
-   
+      $heap->{count}++;
       # HTTP::Request
       my $request  = $request_packet->[0];
       my $response = $response_packet->[0];
       
       # the PoCoClientHTTP sends the first chunk in the content
       # of the http response
-      #if ($heap->{'count'} == 1) {
-      #   my $data = $response->content;
-      #   chomp($data);
-#print $data."\n";
-       #  ok($data =~ /Hello World 0/, "First one as response content received");
-      #}
-      
-      # then all streamed data in the second element of the response
-      # array ...
-      my ($resp, $data) = @$response_packet;
+      my $data = $response->content;
       chomp($data);
+      ok($data =~ /this is bonk/, "Response content received");
       
-      ok($data =~ /Hello World/, "Received a hello");
-  
-      if ($heap->{'count'} == 2) {
-         is($heap->{'count'}, 2, "Got 3 streamed helloworlds ... all good :)");
-         exit;
+      if ($heap->{count} <= 1) {
+         POE::Kernel->post('ua', 'request', 'response', $request);
       }
-      $heap->{'count'}++;
+      else {
+
+        $kernel->delay_set('quit', 5);
+        #exit;
+	  }
    }
 
    POE::Kernel->run;
@@ -97,7 +108,7 @@ if ($pid)  # we are parent
 ####################################################################
 else  # we are the child
 {                          
-    POE::Component::Server::SimpleHTTP->new(
+    POE::Component::Server::SimpleHTTP::PreFork->new(
                 'ALIAS'         =>      'HTTPD',
                 'ADDRESS'       =>      "$IP",
                 'PORT'          =>      $PORT,
@@ -109,6 +120,12 @@ else  # we are the child
                			'EVENT'		=>	'GOT_MAIN',
                		},
                 ],
+                'FORKHANDLERS'          =>      { 'HTTP_GET' => 'FORKED' },
+                'MINSPARESERVERS'       =>      1,
+                'MAXSPARESERVERS'       =>      10,
+                'MAXCLIENTS'            =>      256,
+                'STARTSERVERS'          =>      1,
+                'MAXREQUESTPERCHILD'    =>      1,
     );
     # Create our own session to receive events from SimpleHTTP
     POE::Session->create(
@@ -116,16 +133,40 @@ else  # we are the child
                         '_start'        => sub {   
                            $_[KERNEL]->alias_set( 'HTTP_GET' );
                            $_[KERNEL]->yield('keepalive');
+                           $test{requests} = 0;
+                           $test{forkeds} = 0;
                         },
                   		'GOT_MAIN'	   =>	\&GOT_MAIN,
                   		'GOT_STREAM'	=>	\&GOT_STREAM,
-		                  keepalive      => \&keepalive,
+                  		'FORKED'	=>	\&FORKED,
+                        'SHUTDOWN'  => \&shutdown,
                 },   
     );
     
     POE::Kernel->run;
 }
 
+sub FORKED {
+   my( $kernel, $heap) = @_[KERNEL, HEAP];
+   
+   $test{forkeds}++;
+   
+   if ($test{requests} == 1) {
+      ok($test{forkeds} == 2, "Forked a child.. it's fine");
+   }
+   elsif ($test{requests} == 2) {
+      ok($test{forkeds} == 3, "Forked again child.. it's again fine");
+      $test{requests} = 0; # ok that's ugly ..
+      #POE::Kernel->post('HTTPD', 'SHUTDOWN');
+      $kernel->delay_set('SHUTDOWN', 3);
+   }
+   
+}
+
+sub shutdown {
+		POE::Kernel->call('HTTPD', 'SHUTDOWN');
+ exit;
+}
 
 sub GOT_MAIN {
     # ARG0 = HTTP::Request object, ARG1 = HTTP::Response object, ARG2 = the DIR that matched
@@ -136,39 +177,9 @@ sub GOT_MAIN {
 
    $response->content_type("text/plain");
    
-   print "# GOT_MAIN \n";
-   # sets the response as streamed within our session with the stream event
-   $response->stream(
-      session     => 'HTTP_GET',
-      event       => 'GOT_STREAM'
-   );   
-
-   $heap->{'count'} ||= 0;
-    
-    # We are done!
-   $kernel->yield('GOT_STREAM', $response);
+   $test{requests}++;
+   $response->content("this is bonk");
+   $_[KERNEL]->post( 'HTTPD', 'DONE', $response );
 }
 
-sub GOT_STREAM {
-   my ( $kernel, $heap, $response ) = @_[KERNEL, HEAP, ARG0];
-
-   # lets go on streaming ...
-   if ($heap->{'count'} <= 2) {
-      my $text = "Hello World ".$heap->{'count'}." \n";
-      #print "send ".$text."\n";
-      $response->content($text);
-      
-      $heap->{'count'}++;
-      POE::Kernel->post('HTTPD', 'STREAM', $response);
-   }
-   else {
-      POE::Kernel->post('HTTPD', 'CLOSE', $response );
-   }
-}
-
-sub keepalive { 
-   my ( $heap ) = @_[HEAP];
-
-   $_[KERNEL]->delay_set('keepalive', 1);
-}
 

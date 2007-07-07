@@ -26,8 +26,8 @@ use HTTP::Date qw( time2str );
 # Our own HTTP modules
 use POE::Component::Server::SimpleHTTP::Connection;
 use POE::Component::Server::SimpleHTTP::Response;
-
-# Set some constants
+#sub DEBUG {1}
+#Set some constants
 BEGIN {
 	# Debug fun!
 	if ( ! defined &DEBUG ) {
@@ -54,7 +54,7 @@ sub new {
 	my %opt = @_;
 
 	# Our own options
-	my ( $ALIAS, $ADDRESS, $PORT, $HOSTNAME, $HEADERS, $HANDLERS, $SSLKEYCERT, $LOGHANDLER );
+	my ( $ALIAS, $ADDRESS, $PORT, $HOSTNAME, $HEADERS, $HANDLERS, $SSLKEYCERT, $LOGHANDLER, $ERRORHANDLER );
 
 	# You could say I should do this: $Stuff = delete $opt{'Stuff'}
 	# But, that kind of behavior is not defined, so I would not trust it...
@@ -175,6 +175,20 @@ sub new {
 		croak( 'HANDLERS is required to create a new POE::Component::Server::SimpleHTTP instance!' );
 	}
 
+	# Get the ERRORHANDLER handler
+	if ( exists $opt{'ERRORHANDLER'} and defined $opt{'ERRORHANDLER'} ) {
+		# Make sure it is ref to an hash
+		if ( ref $opt{'ERRORHANDLER'} and ref( $opt{'ERRORHANDLER'} ) eq 'HASH' ) {
+			$ERRORHANDLER = delete $opt{'ERRORHANDLER'};
+			croak( 'ERRORHANDLER does not have a SESSION attribute' ) 
+			  unless $ERRORHANDLER->{'SESSION'};
+			croak( 'ERRORHANDLER does not have an EVENT attribute' ) 
+			  unless $ERRORHANDLER->{'EVENT'};
+		} else {
+			croak( 'ERRORHANDLER must be a reference to an HASH!' );
+		}
+	}
+
 	if ( exists $opt{'LOGHANDLER'} and defined $opt{'LOGHANDLER'} ) {
 		if ( ref $opt{'LOGHANDLER'} and ref $opt{'LOGHANDLER'} eq 'HASH' ) {
 			$LOGHANDLER = delete $opt{'LOGHANDLER'};
@@ -196,16 +210,17 @@ sub new {
 	}
 	
 	my $data = { 
-			'ALIAS'		=>	$ALIAS,
-			'ADDRESS'	=>	$ADDRESS,
-			'PORT'		=>	$PORT,
-			'HEADERS'	=>	$HEADERS,
-			'HOSTNAME'	=>	$HOSTNAME,
-			'HANDLERS'	=>	$HANDLERS,
-			'REQUESTS'	=>	{},
-			'RETRIES'	=>	0,
-			'SSLKEYCERT'	=>	$SSLKEYCERT,
-			'LOGHANDLER'    =>	$LOGHANDLER,
+			'ALIAS'		   =>	$ALIAS,
+			'ADDRESS'	   =>	$ADDRESS,
+			'PORT'		   =>	$PORT,
+			'HEADERS'	   =>	$HEADERS,
+			'HOSTNAME'	   =>	$HOSTNAME,
+			'HANDLERS'	   =>	$HANDLERS,
+			'REQUESTS'	   =>	{},
+			'RETRIES'	   =>	0,
+			'SSLKEYCERT'   =>	$SSLKEYCERT,
+			'LOGHANDLER'   =>	$LOGHANDLER,
+			'ERRORHANDLER' =>	$ERRORHANDLER,
 	};
 
 	my $self = bless $data, $type;
@@ -241,6 +256,9 @@ sub new {
 
 			# Send output to connection!
 			'DONE'		=>	\&Request_Output,
+			
+			# Stream output to connection!
+			'STREAM'	   =>	\&Stream_Output,
 
 			# Kill the connection!
 			'CLOSE'		=>	\&Request_Close,
@@ -824,29 +842,18 @@ sub Request_Output {
 	# Get the wheel ID
 	my $id = $response->_WHEEL;
 
-   if (defined $response->{'STREAM'}) {
-      # Keep track if we plan to stream ...   	
-   	if ( $_[HEAP]->{'RESPONSES'}->{ $id } ) {
-   	   if ( DEBUG ) {
-   	      warn "Restoring response from HEAP and id $id ";
-   	   }
-   		$response = $_[HEAP]->{'RESPONSES'}->{ $id };
-   	}
-   	else {
-   	   if ( DEBUG ) {
-   	      warn "Saving HEAP response to id $id ";
-   	   }
-         $_[HEAP]->{'RESPONSES'}->{ $id } = $response;
-      }
-   }
-
 	# Check if the wheel exists ( sometimes it gets closed by the client, but the application doesn't know that... )
 	if ( ! exists $_[HEAP]->{'REQUESTS'}->{ $id } ) {
 		# Debug stuff
 		if ( DEBUG ) {
 			warn 'Wheel disappeared, but the application sent us a DONE event, discarding it';
 		}
-
+		
+      POE::Kernel->post(
+         $_[HEAP]->{ERRORHANDLER}->{SESSION},
+         $_[HEAP]->{ERRORHANDLER}->{EVENT},
+         'Wheel disappeared !'
+      );
 		# All done!
 		return 1;
 	}
@@ -863,6 +870,11 @@ sub Request_Output {
 		if ( DEBUG ) {
 			warn 'Tried to send data over a closed/nonexistant socket!';
 		}
+      POE::Kernel->post(
+         $_[HEAP]->{ERRORHANDLER}->{SESSION},
+         $_[HEAP]->{ERRORHANDLER}->{EVENT},
+         'Socket closed/nonexistant !'
+      ); 
 		return;
 	}
 
@@ -881,74 +893,148 @@ sub Request_Output {
 	if ( ! $response->header( 'Content-Type' ) ) {
 		$response->header( 'Content-Type', 'text/html' );
 	}
+   
+   # Send it out!
+   $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->put( $response );
 
-   unless (defined $response->{STREAM}) {
+   # Mark this socket done
+   $_[HEAP]->{'REQUESTS'}->{ $id }->[1] = 1;
+
+   # Debug stuff
+   if ( DEBUG ) {
+           warn "Completed with Wheel ID $id";
+   }
+  
+   # Success!
+   return 1;
+}
+
+# Stream output to the client
+sub Stream_Output {
+   # ARG0 = HTTP::Response object
+   my ($kernel, $response) = @_[KERNEL, ARG0 ];   
    
-   	# Send it out!
-   	$_[HEAP]->{'REQUESTS'}->{ $id }->[0]->put( $response );
+   # Check if we got it
+   if ( ! defined $response or ! UNIVERSAL::isa( $response, 'HTTP::Response' ) ) {
+      if ( DEBUG ) {
+         warn 'Did not get a HTTP::Response object!';
+      }
+      
+      # Abort...
+      return undef;
+   }
    
-   	# Mark this socket done
-   	$_[HEAP]->{'REQUESTS'}->{ $id }->[1] = 1;
-   
-   	# Debug stuff
-   	if ( DEBUG ) {
-   		warn "Completed with Wheel ID $id";
-   	}
+   # Get the wheel ID
+   my $id = $response->_WHEEL;
+   $_[HEAP]->{'CHUNKCOUNT'}->{ $id }++;
+
+   if (defined $response->{'STREAM'}) {
+      # Keep track if we plan to stream ...   	
+      if ( $_[HEAP]->{'RESPONSES'}->{ $id } ) {
+         if ( DEBUG ) {
+            warn "Restoring response from HEAP and id $id ";
+         }
+         $response = $_[HEAP]->{'RESPONSES'}->{ $id };
+      }
+      else {
+         if ( DEBUG ) {
+            warn "Saving HEAP response to id $id ";
+         }
+         $_[HEAP]->{'RESPONSES'}->{ $id } = $response;
+      }
    }
    else {
-            
-      # Loops through current streams
-      foreach (keys %{ $_[HEAP]->{'RESPONSES'} }) {
-
-         # Preliminary check
-      	if ( ! defined $_[HEAP]->{'REQUESTS'}->{ $_ }->[0] 
-      	      or ! defined $_[HEAP]->{'REQUESTS'}->{ $_ }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
-      		if ( DEBUG ) {
-      			warn 'Tried to send data over a closed/nonexistant socket!';
-      		}
-      		next;
-      	}
-   	
-         # Sets the correct POE::Filter
-         unless (defined $response->{'IS_STREAMING'}) {
-         	# Mark this socket done
-         	$_[HEAP]->{'REQUESTS'}->{ $id }->[1] = 2;
-         	
-         	#
-            $_[HEAP]->{'REQUESTS'}->{ $_ }->[0]->set_output_filter(POE::Filter::Stream->new() ) ;
-            $response->is_streaming(1);
-         }
-         
-         if ( DEBUG ) {
-      		print "Sending stream via ".$response->{STREAM_SESSION}."/".$response->{STREAM}." to $_ with id $id \n" ;
-      	}
-         
-         my %stream = (
-            wheel    => $_[HEAP]->{'REQUESTS'}->{ $_ }->[0],  # wheel
-            request  => $_[HEAP]->{'REQUESTS'}->{ $id }->[3],  # request
-            response => $_[HEAP]->{'RESPONSES'}->{$_},         # response
-            id       => $_                                     # id
-         );
-         
-         # we send the event to stream with wheels request and response to the session 
-         # that has registered the streaming event (can be our own session ? it is left
-         # it because initially it was a simple $kernel->post)            
-   	   if (defined $response->{STREAM_SESSION}) {
-            POE::Kernel->post(
-               $response->{STREAM_SESSION},           # callback session
-               $response->{STREAM},                   # callback event
-               \%stream
-            );  
-         }
-         else {
-            POE::Kernel->post(
-               $response->{STREAM},                   # callback event
-               \%stream
-            );  
-         }
-   	}
+      if ( DEBUG ) {
+         warn 'Can\'t push on a response that has not been not set as a STREAM!';
+      }
+      # Abort...
+      return undef;
    }
-	# Success!
+
+   # Check if the wheel exists ( sometimes it gets closed by the client, but the application doesn't know that... )
+   if ( ! exists $_[HEAP]->{'REQUESTS'}->{ $id } ) {
+      # Debug stuff
+      if ( DEBUG ) {
+         warn 'Wheel disappeared, but the application sent us a DONE event, discarding it';
+      }
+      POE::Kernel->post(
+         $_[HEAP]->{ERRORHANDLER}->{SESSION},
+         $_[HEAP]->{ERRORHANDLER}->{EVENT},
+         'Wheel disappeared !'
+      ); 
+      # All done!
+      return 1;
+   }
+   
+   # Quick check to see if the wheel/socket died already...
+   # Initially reported by Tim Wood
+   if ( ! defined $_[HEAP]->{'REQUESTS'}->{ $id }->[0] 
+      or ! defined $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
+      if ( DEBUG ) {
+         warn 'Tried to send data over a closed/nonexistant socket!';
+      }
+      POE::Kernel->post(
+         $_[HEAP]->{ERRORHANDLER}->{SESSION},
+         $_[HEAP]->{ERRORHANDLER}->{EVENT},
+         'Socket closed/nonexistant !'
+      ); 
+      return;
+   }
+   
+   # Set the date if needed
+   if ( ! $response->header( 'Date' ) ) {
+      $response->header( 'Date', time2str( time ) );
+   }
+   
+   # Set the Content-Type if needed
+   if ( ! $response->header( 'Content-Type' ) ) {
+      $response->header( 'Content-Type', 'text/html' );
+   }
+
+   # Preliminary check
+   if ( ! defined $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0] 
+      or ! defined $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
+      if ( DEBUG ) {
+         warn 'Tried to send data over a closed/nonexistant socket!';
+      }
+      next;
+   }
+
+   # Sets the correct POE::Filter
+   unless (defined $response->{'IS_STREAMING'}) {
+      # Mark this socket done
+      $_[HEAP]->{'REQUESTS'}->{ $id }->[1] = 2;
+      
+      #
+      $response->{'IS_STREAMING'} = 1;
+   }
+   
+   if ( DEBUG ) {
+      warn "Sending stream via ".$response->{STREAM_SESSION}."/".$response->{STREAM}." with id $id \n" ;
+   }      
+
+   if ( $_[HEAP]->{'CHUNKCOUNT'}->{ $id } > 1  ) {
+      $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]->set_output_filter(POE::Filter::Stream->new() ) ;
+      $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]->put($response->content);
+   }
+   else {
+      $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]->set_output_filter(POE::Filter::HTTPD->new() ) ;
+      $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]->put($response);
+   }
+
+   $response->content();
+   
+   # we send the event to stream with wheels request and response to the session 
+   # that has registered the streaming event     
+   unless ($response->{'dont_flush'}) {          
+      POE::Kernel->post(
+         $response->{STREAM_SESSION},           # callback session
+         $response->{STREAM},                   # callback event
+         $_[HEAP]->{'RESPONSES'}->{$response->_WHEEL}
+      ); 
+   }
+	
+    # Success!
 	return 1;
 }
 
@@ -1344,40 +1430,71 @@ SimpleHTTP is so simple, there are only 8 events available.
 		Close the listening socket
 		Waits for all pending requests to come in via DONE/CLOSE, then removes it's alias
 
+=item C<STREAM>
+
+	With a $response argument it streams the content and calls back the streaming event
+	of the user's session (or with the dont_flush option you're responsible for calling
+        back your session's streaming event).	
+	
+	To use the streaming feature see below.
+
 =back
 
 =head2 Streaming with SimpleHTTP
 
-It's now possible to send data as a stream to clients (unbuffered and integrated in the 
+It's possible to send data as a stream to clients (unbuffered and integrated in the 
 POE loop).
 
-Just create your sessions as usually and add a streaming event, this event will be triggered
-each time you set the $response to a streaming state:
+Just create your session to receive events from SimpleHTTP as usually and add a
+streaming event, this event will be triggered over and over each time you set the
+$response to a streaming state and once you trigger it:
 
-   # sets the response as streamed within our session with the stream event
+   # sets the response as streamed within our session which alias is HTTP_GET
+   # with the event GOT_STREAM
    $response->stream(
-      session  => 'HTTP_GET',
-      event    => 'GOT_STREAM'
-   );   
+      session     => 'HTTP_GET',
+      event       => 'GOT_STREAM',
+      dont_flush  => 1
+   );
+   
+   # then you can simply yield your streaming event, once the GOT_STREAM event
+   # has reached its end it will be triggered again and again, until you
+   # send a CLOSE event to the kernel with the appropriate response as parameter
+   $kernel->yield('GOT_STREAM', $response);
 
-This will call the GOT_STREAM event of the HTTP_GET session with as first arg (ARG0) bundled
-within a hash the wheel, request, response and id.
+The optionnal dont_flush option gives the user the ability to control the callback
+to the streaming event, which means once your stream event has reached its end
+it won't be called, you have to call it back.
 
-You can now send data by chunks and either call yourself back (via POE) or shutdown when your 
-streaming is done (EOF for example).
+You can now send data by chunks and either call yourself back (via POE) or
+shutdown when your streaming is done (EOF for example).
 
    sub GOT_STREAM {
-      my ( $kernel, $heap, $stream ) = @_[KERNEL, HEAP, ARG0];
+      my ( $kernel, $heap, $response ) = @_[KERNEL, HEAP, ARG0];
       
-      # $stream contains the wheel, the request, the response 
-      # and an id associated the the wheel
-      $stream->{'wheel'}->put("Hello World\n");
-   
-      # lets go on streaming ... with some delay actually but
-      # that should be a post unless the client needs the data
-      # slowly ..
-      POE::Kernel->delay('GOT_STREAM', 1, $stream );
+      # sets the content of the response
+      $response->content("Hello World\n");
+      
+      # send it to the client
+      POE::Kernel->post('HTTPD', 'STREAM', $response);
+
+      # if we have previously set the dont_flush option
+      # we have to trigger our event back until the end of
+      # the stream like this (that can be a yield, of course):
+      #
+      # $kernel->delay('GOT_STREAM', 1, $stream );
+
+      # otherwise the GOT_STREAM event is triggered continously until
+      # we call the CLOSE event on the response like that :
+      #
+      if ($heap{'streaming_is_done'}) {
+         # close the socket and end the stream
+         POE::Kernel->post('HTTPD', 'CLOSE', $response );
+      }
    }
+
+The dont_flush option is there to be able to control the frequency of flushes
+to the client. 
 
 =head2 SimpleHTTP Notes
 
