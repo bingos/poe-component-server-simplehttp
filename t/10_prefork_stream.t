@@ -1,12 +1,19 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 4;
+use Test::More tests => 3;
 
 use HTTP::Request;
 use POE;
 use POE::Kernel;
 use POE::Component::Client::HTTP;
+
+SKIP: {
+
+eval { use IPC::Shareable; };
+
+skip "Skipping PreFork tests" , 3 if $@;
+
 use POE::Component::Server::SimpleHTTP::PreFork;
 
 my $PORT = 2080;
@@ -180,5 +187,7 @@ sub keepalive {
    my ( $heap ) = @_[HEAP];
 
    $_[KERNEL]->delay_set('keepalive', 1);
+}
+
 }
 
