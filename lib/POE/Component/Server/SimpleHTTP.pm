@@ -116,13 +116,14 @@ sub new {
 		croak( 'PORT is required to create a new POE::Component::Server::SimpleHTTP instance!' );
 	}
 
+	# BinGOS was here: This is unecessary, fall back on default SocketFactory behaviour.
 	# Get the ADDRESS
-	if ( exists $opt{'ADDRESS'} and defined $opt{'ADDRESS'} and length( $opt{'ADDRESS'} ) ) {
-		$ADDRESS = $opt{'ADDRESS'};
-		delete $opt{'ADDRESS'};
-	} else {
-		croak( 'ADDRESS is required to create a new POE::Component::Server::SimpleHTTP instance!' );
-	}
+	#if ( exists $opt{'ADDRESS'} and defined $opt{'ADDRESS'} and length( $opt{'ADDRESS'} ) ) {
+	#	$ADDRESS = $opt{'ADDRESS'};
+	#	delete $opt{'ADDRESS'};
+	#} else {
+	#	croak( 'ADDRESS is required to create a new POE::Component::Server::SimpleHTTP instance!' );
+	#}
 
 	# Get the HOSTNAME
 	if ( exists $opt{'HOSTNAME'} and defined $opt{'HOSTNAME'} and length( $opt{'HOSTNAME'} ) ) {
@@ -1115,7 +1116,6 @@ POE::Component::Server::SimpleHTTP - Perl extension to serve HTTP requests in PO
 	# Start the server!
 	POE::Component::Server::SimpleHTTP->new(
 		'ALIAS'		=>	'HTTPD',
-		'ADDRESS'	=>	'192.168.1.1',
 		'PORT'		=>	11111,
 		'HOSTNAME'	=>	'MySite.com',
 		'HANDLERS'	=>	[
@@ -1283,11 +1283,11 @@ This will default to "SimpleHTTP"
 
 =item C<ADDRESS>
 
-This value will be passed to POE::Component::Server::TCP to bind to.
+This value will be passed to POE::Wheel::SocketFactory to bind to, will use INADDR_ANY if it is nothing is provided.
 
 =item C<PORT>
 
-This value will be passed to POE::Component::Server::TCP to bind to.
+This value will be passed to POE::Wheel::SocketFactory to bind to.
 
 =item C<HOSTNAME>
 
