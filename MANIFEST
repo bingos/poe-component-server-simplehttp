@@ -17,14 +17,14 @@ Makefile.PL
 MANIFEST			This list of files
 META.yml
 README
+t/01_load.t
+t/02_pod.t
+t/03_pod_coverage.t
+t/04_test_kwalitee.t
+t/05_run.t
+t/06_stream.t
+t/07_bad_request.t
+t/08_post.t
+t/09_prefork_maxrequestperchild.t
 t/10_prefork_stream.t
-t/1_load.t
-t/2_pod.t
-t/3_pod_coverage.t
-t/4_test_kwalitee.t
-t/5_run.t
-t/6_stream.t
-t/7_bad_request.t
-t/8_post.t
-t/9_prefork_maxrequestperchild.t
 tools/svn-log.perl

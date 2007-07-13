@@ -1,14 +1,17 @@
-#!/usr/bin/perl -w
-
 use strict;
-use Test::More tests => 3;
+use Test::More;
+
+BEGIN {
+   eval { require IPC::Shareable; };
+   plan skip_all => 'IPC::Shareable is required for this test' if $@;
+}
+
+plan tests => 3;
 
 use HTTP::Request;
 use POE;
 use POE::Kernel;
 use POE::Component::Client::HTTP;
-
-SKIP: {
 
 eval { use IPC::Shareable; };
 
@@ -188,6 +191,3 @@ sub keepalive {
 
    $_[KERNEL]->delay_set('keepalive', 1);
 }
-
-}
-

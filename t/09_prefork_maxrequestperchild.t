@@ -1,18 +1,17 @@
-#!/usr/bin/perl -w
-
 use strict;
-use Test::More tests => 2;
+use Test::More;
+
+BEGIN {
+   eval { require IPC::Shareable; };
+   plan skip_all => 'IPC::Shareable is required for this test' if $@;
+}
+
+plan tests => 3;
 
 use HTTP::Request;
 use POE;
 use POE::Kernel;
 use POE::Component::Client::HTTP;
-
-SKIP: {
-
-eval { use IPC::Shareable; };
-
-skip "Skipping PreFork tests", 2 if $@;
 
 use POE::Component::Server::SimpleHTTP::PreFork;
 
@@ -186,6 +185,4 @@ sub GOT_MAIN {
    $test{requests}++;
    $response->content("this is bonk");
    $_[KERNEL]->post( 'HTTPD', 'DONE', $response );
-}
-
 }
