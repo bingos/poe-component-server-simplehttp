@@ -17,7 +17,7 @@ requires    'Socket'           =>    0;
 requires    'HTTP::Request'    =>    0;
 requires    'HTTP::Response'   =>    0;
 
-build_requires   'Test::More'                   =>    0;
+build_requires   'Test::More'                   => 0.47;
 build_requires   'LWP::UserAgent'               =>    0;
 build_requires   'POE::Component::Client::HTTP' =>    0;
 

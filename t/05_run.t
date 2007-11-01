@@ -1,8 +1,9 @@
-#!/usr/bin/perl -w
-
 use strict;
-use Test::More tests => 14;
-#use Test::More 'no_plan';
+use Test::More;
+
+plan skip_all => 'MSWin32 does not have a proper fork()' if $^O eq 'MSWin32';
+
+plan tests => 14;
 
 use LWP::UserAgent;
 use LWP::ConnCache;
@@ -39,7 +40,7 @@ if ($pid)  # we are parent
     my $req=HTTP::Request->new(GET => "http://$IP:$PORT/");
     my $resp=$UA->request($req);
 
-    ok($resp->is_success, "got index") or die "resp=", Dump $resp;
+    ok($resp->is_success, "got index") or die "resp=", $resp->as_string();
     my $content=$resp->content;
     ok($content =~ /this is top/, "got top index");
 

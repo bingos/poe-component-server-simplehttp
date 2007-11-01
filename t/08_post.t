@@ -1,8 +1,9 @@
-#!/usr/bin/perl -w
-
 use strict;
-use Test::More tests => 2;
-#use Test::More 'no_plan';
+use Test::More;
+
+plan skip_all => 'MSWin32 does not have a proper fork()' if $^O eq 'MSWin32';
+
+plan tests => 2;
 
 use LWP::UserAgent;
 use LWP::ConnCache;

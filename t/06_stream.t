@@ -1,7 +1,9 @@
-#!/usr/bin/perl -w
-
 use strict;
-use Test::More tests => 3;
+use Test::More;
+
+plan skip_all => 'MSWin32 does not have a proper fork()' if $^O eq 'MSWin32';
+
+plan tests => 3;
 
 use HTTP::Request;
 use POE;

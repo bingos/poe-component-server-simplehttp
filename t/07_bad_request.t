@@ -1,17 +1,13 @@
-#!/usr/bin/perl -w
-
 use strict;
 use Test::More 'no_plan';
-#use Test::More tests => 11;
+
+plan skip_all => 'MSWin32 does not have a proper fork()' if $^O eq 'MSWin32';
 
 use HTTP::Request;
 use POE;
 use POE::Kernel;
 use POE::Component::Server::SimpleHTTP;
 use LWP;
-
-
-
 
 my $PORT = 2080;
 my $IP = "localhost";
