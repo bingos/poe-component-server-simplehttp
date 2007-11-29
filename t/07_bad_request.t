@@ -1,7 +1,9 @@
 use strict;
-use Test::More 'no_plan';
+use Test::More;
 
 plan skip_all => 'MSWin32 does not have a proper fork()' if $^O eq 'MSWin32';
+
+plan 'no_plan';
 
 use HTTP::Request;
 use POE;
