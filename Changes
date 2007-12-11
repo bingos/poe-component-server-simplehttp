@@ -1,4 +1,14 @@
 ========================
+2007-11-29 12:11:45 1.25
+========================
+
+  2007-11-29 12:10:14 (r77) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; Changes M; t/07_bad_request.t
+  M
+
+    Fixed one of the test cases for MSWin32
+
+========================
 2007-11-01 15:08:54 1.24
 ========================
 

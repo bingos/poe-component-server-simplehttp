@@ -1,81 +1,21 @@
 use strict;
 use Test::More;
 
-plan skip_all => 'MSWin32 does not have a proper fork()' if $^O eq 'MSWin32';
+#plan skip_all => 'MSWin32 does not have a proper fork()' if $^O eq 'MSWin32';
 
 plan tests => 14;
 
 use LWP::UserAgent;
 use LWP::ConnCache;
 use HTTP::Request;
-use POE;
+use POE qw(Wheel::Run Filter::Reference Filter::Line);
 use POE::Kernel;
 use POE::Component::Server::SimpleHTTP;
 
 my $PORT = 2080;
 my $IP = "localhost";
 
-my $pid = fork;
-die "Unable to fork: $!" unless defined $pid;
-
-END {
-    if ($pid) {
-        kill 2, $pid or warn "Unable to kill $pid: $!";
-    }
-}
-
-####################################################################
-if ($pid)  # we are parent
-{                      
-    # stop kernel from griping
-    ${$poe_kernel->[POE::Kernel::KR_RUN]} |=
-      POE::Kernel::KR_RUN_CALLED;
-
-    diag("$$: Sleep 2...");
-    sleep 2;
-    diag("continue");
-
-    my $UA = LWP::UserAgent->new;
-  again:
-    my $req=HTTP::Request->new(GET => "http://$IP:$PORT/");
-    my $resp=$UA->request($req);
-
-    ok($resp->is_success, "got index") or die "resp=", $resp->as_string();
-    my $content=$resp->content;
-    ok($content =~ /this is top/, "got top index");
-
-    $req=HTTP::Request->new(GET => "http://$IP:$PORT/honk/");
-    $resp=$UA->request($req);
-
-    ok($resp->is_success, "got something");
-    $content=$resp->content;
-    ok($content =~ /this is honk/, "something honked");
-
-    $req=HTTP::Request->new(GET => "http://$IP:$PORT/bonk/zip.html");
-    $resp=$UA->request($req);
-    ok(($resp->is_success and $resp->content_type eq 'text/html'),
-       "get text/html");
-    $content=$resp->content;
-    ok($content =~ /my friend/, 'my friend');
-    
-    # Test for 404
-    diag('Test for 404');
-    $req=HTTP::Request->new(GET => "http://$IP:$PORT/wedonthaveone");
-    $resp=$UA->request($req);
-    
-    is($resp->code, 404, "404 code returned from bad handler call, this is good.");
-
-    unless ($UA->conn_cache) {
-        diag( "Enabling Keep-Alive and going again" );
-        $UA->conn_cache( LWP::ConnCache->new() );
-        goto again;
-    }
-}
-
-####################################################################
-else  # we are the child
-{                          
-    POE::Component::Server::SimpleHTTP->new(
+POE::Component::Server::SimpleHTTP->new(
                 'ALIAS'         =>      'HTTPD',
                 'ADDRESS'       =>      "$IP",
                 'PORT'          =>      $PORT,
@@ -104,18 +44,55 @@ else  # we are the child
                 ],
     );
     # Create our own session to receive events from SimpleHTTP
-    POE::Session->create(
+POE::Session->create(
                 inline_states => {
-                        '_start'        => sub {   $_[KERNEL]->alias_set( 'HTTP_GET' ) },
+                        '_start'        => sub {   $poe_kernel->alias_set( 'HTTP_GET' );
+						   $poe_kernel->delay( '_tests', 3 );
+						   return;
+					   },
+			'_tests'	=> \&_start_tests,
                         'TOP'           => \&top,
                         'HONK'          => \&honk,
                         'BONK'          => \&bonk,
                        	'BONK2'         => \&bonk2,
+			'_close'	=> \&_close,
+			'_stdout'	=> \&_stdout,
+			'_stderr'	=> \&_stderr,
                 },
-    );
-    $poe_kernel->run;
+);
+$poe_kernel->run;
+exit 0;
+
+sub _start_tests {
+  my ($kernel,$heap) = @_[KERNEL,HEAP];
+  $heap->{_wheel} = POE::Wheel::Run->new(
+	Program => \&_tests,
+	StdioFilter  => POE::Filter::Reference->new(),
+	StderrFilter => POE::Filter::Line->new(),
+	CloseEvent => '_close',
+	ErrorEvent => '_close',
+	StdoutEvent => '_stdout',
+	StderrEvent => '_stderr',
+  );
+  return;
 }
 
+sub _close {
+  delete $_[HEAP]->{_wheel};
+  $poe_kernel->post( 'HTTPD', 'SHUTDOWN' );
+  $poe_kernel->alias_remove( 'HTTP_GET' );
+  return;
+}
+
+sub _stdout {
+  ok( $_[ARG0]->{result}, $_[ARG0]->{test} );
+  return;
+}
+
+sub _stderr {
+  print STDERR $_[ARG0], "\n";
+  return;
+}
 
 #######################################
 sub top
@@ -161,4 +138,56 @@ sub bonk2
     HTML
     $_[KERNEL]->post( 'HTTPD', 'DONE', $response );
 }
+
+####################################################################
+sub _tests
+{                      
+    #sleep 2;
+    binmode(STDOUT) if $^O eq 'MSWin32';
+    my $filter = POE::Filter::Reference->new();
+
+    my $results = [ ];
+    my $UA = LWP::UserAgent->new;
+    again:
+    my $req=HTTP::Request->new(GET => "http://$IP:$PORT/");
+    my $resp=$UA->request($req);
+
+    die "resp=", $resp->as_string() unless $resp->is_success;
+    push @$results, { test => "got index", result => $resp->is_success };
+    my $content=$resp->content;
+    push @$results, { test => "got top index", result => $content =~ /this is top/ };
+
+    $req=HTTP::Request->new(GET => "http://$IP:$PORT/honk/");
+    $resp=$UA->request($req);
+
+    push @$results, { test => "got something", result => $resp->is_success };
+    $content=$resp->content;
+    push @$results, { test => "something honked", result => $content =~ /this is honk/ };
+
+    $req=HTTP::Request->new(GET => "http://$IP:$PORT/bonk/zip.html");
+    $resp=$UA->request($req);
+    push @$results, { test => "get text/html", result => 
+			($resp->is_success and $resp->content_type eq 'text/html') };
+    $content=$resp->content;
+    push @$results, { test => "my friend", result => $content =~ /my friend/ };
+    
+    # Test for 404
+    #diag('Test for 404');
+    $req=HTTP::Request->new(GET => "http://$IP:$PORT/wedonthaveone");
+    $resp=$UA->request($req);
+    
+    #is($resp->code, 404, "404 code returned from bad handler call, this is good.");
+    push @$results, { test => "404 code returned from bad handler call, this is good.", 
+			result => ( $resp->code eq '404' ) };
+
+    unless ($UA->conn_cache) {
+        #diag( "Enabling Keep-Alive and going again" );
+        $UA->conn_cache( LWP::ConnCache->new() );
+        goto again;
+    }
+    my $replies = $filter->put( $results );
+    print STDOUT @$replies;
+    return;
+}
+
 
