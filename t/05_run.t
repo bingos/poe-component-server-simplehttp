@@ -42,12 +42,13 @@ POE::Component::Server::SimpleHTTP->new(
                                 'EVENT'         =>      'TOP',
                         },
                 ],
+		SETUPHANDLER => { SESSION => 'HTTP_GET', EVENT => '_tests', },
     );
     # Create our own session to receive events from SimpleHTTP
 POE::Session->create(
                 inline_states => {
                         '_start'        => sub {   $poe_kernel->alias_set( 'HTTP_GET' );
-						   $poe_kernel->delay( '_tests', 3 );
+						   #$poe_kernel->delay( '_tests', 8 );
 						   return;
 					   },
 			'_tests'	=> \&_start_tests,
@@ -58,6 +59,7 @@ POE::Session->create(
 			'_close'	=> \&_close,
 			'_stdout'	=> \&_stdout,
 			'_stderr'	=> \&_stderr,
+			'_sig_chld'     => \&_sig_chld,
                 },
 );
 $poe_kernel->run;
@@ -74,6 +76,7 @@ sub _start_tests {
 	StdoutEvent => '_stdout',
 	StderrEvent => '_stderr',
   );
+  $kernel->sig_child( $heap->{_wheel}->PID(), '_sig_chld' ) unless $^O eq 'MSWin32';
   return;
 }
 
@@ -92,6 +95,10 @@ sub _stdout {
 sub _stderr {
   print STDERR $_[ARG0], "\n";
   return;
+}
+
+sub _sig_chld {
+  return $poe_kernel->sig_handled();
 }
 
 #######################################

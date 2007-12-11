@@ -56,7 +56,7 @@ sub new {
 	my %opt = @_;
 
 	# Our own options
-	my ( $ALIAS, $ADDRESS, $PORT, $HOSTNAME, $HEADERS, $HANDLERS, $SSLKEYCERT, $LOGHANDLER, $ERRORHANDLER );
+	my ( $ALIAS, $ADDRESS, $PORT, $HOSTNAME, $HEADERS, $HANDLERS, $SSLKEYCERT, $LOGHANDLER, $ERRORHANDLER, $SETUPHANDLER );
 
 	# You could say I should do this: $Stuff = delete $opt{'Stuff'}
 	# But, that kind of behavior is not defined, so I would not trust it...
@@ -205,6 +205,19 @@ sub new {
 		}
 	}
 
+	if ( exists $opt{'SETUPHANDLER'} and defined $opt{'SETUPHANDLER'} ) {
+		if ( ref $opt{'SETUPHANDLER'} and ref $opt{'SETUPHANDLER'} eq 'HASH' ) {
+			$SETUPHANDLER = delete $opt{'SETUPHANDLER'};
+			croak( 'SETUPHANDLER does not have a SESSION attribute' ) 
+			  unless $SETUPHANDLER->{'SESSION'};
+			croak( 'SETUPHANDLER does not have an EVENT attribute' ) 
+			  unless $SETUPHANDLER->{'EVENT'};
+		}
+		else {
+			croak( 'SETUPHANDLER must be a reference to an HASH!' );
+		}
+	}
+
 	# Anything left over is unrecognized
 	if ( DEBUG ) {
 		if ( keys %opt > 0 ) {
@@ -223,6 +236,7 @@ sub new {
 			'RETRIES'	   =>	0,
 			'SSLKEYCERT'   =>	$SSLKEYCERT,
 			'LOGHANDLER'   =>	$LOGHANDLER,
+			'SETUPHANDLER' =>	$SETUPHANDLER,
 			'ERRORHANDLER' =>	$ERRORHANDLER,
 	};
 
@@ -403,6 +417,10 @@ sub SetupListener {
 			'SuccessEvent'	=>	'Got_Connection',
 			'FailureEvent'	=>	'ListenerError',
 		);
+	        $_[KERNEL]->post(
+	   		$_[HEAP]->{'SETUPHANDLER'}->{'SESSION'},
+	   		$_[HEAP]->{'SETUPHANDLER'}->{'EVENT'},
+		) if $_[HEAP]->{'SETUPHANDLER'};
 	}
 
 	# Success!
@@ -1363,6 +1381,18 @@ The event will have the following parameters:
 ARG0 -> HTTP::Request object/undef if client request was malformed.
 
 ARG1 -> the IP address of the client
+
+=item C<SETUPHANDLER>
+
+Expects a hashref with the following key, values:
+
+SESSION	->	The session to send the input
+
+EVENT	->	The event to trigger
+
+You will receive an event when the listener wheel has been setup.
+
+Currently there are no parameters returned.
 
 =item C<SSLKEYCERT>
 
