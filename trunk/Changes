@@ -1,0 +1,273 @@
+========================
+2007-11-29 12:11:45 1.25
+========================
+
+  2007-11-29 12:10:14 (r77) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; Changes M; t/07_bad_request.t
+  M
+
+    Fixed one of the test cases for MSWin32
+
+========================
+2007-11-01 15:08:54 1.24
+========================
+
+  2007-11-01 15:07:15 (r75) by bingos
+  t/05_run.t M; t/08_post.t M; lib/POE/Component/Server/SimpleHTTP.pm M;
+  t/06_stream.t M; Makefile.PL M; t/07_bad_request.t M
+
+    Changes to skip fork tests on MSWin32
+
+  2007-07-13 10:27:38 (r74) by bingos
+  t/5_run.t D; t/9_prefork_maxrequestperchild.t D; t/08_post.t A;
+  t/03_pod_coverage.t A; t/1_load.t D; t/06_stream.t A; MANIFEST M;
+  t/2_pod.t D; t/07_bad_request.t A; t/04_test_kwalitee.t A; t/05_run.t
+  A; t/09_prefork_maxrequestperchild.t A; t/8_post.t D; t/01_load.t A;
+  t/3_pod_coverage.t D; t/6_stream.t D; t/02_pod.t A;
+  t/10_prefork_stream.t M; t/7_bad_request.t D; t/4_test_kwalitee.t D
+
+    Fixed the skipall in the tests requiring IPC::Shareable. Renumbered
+    tests
+
+  2007-07-12 18:53:12 (r73) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; MANIFEST M
+
+    Made ADDRESS parameter optional, thanks to Zach Roberts for pointing
+    that out. Updated the documentation. Fixed MANIFEST
+
+  2007-07-08 09:09:11 (r72) by eriam
+  t/9_prefork_maxrequestperchild.t M; t/10_prefork_stream.t M
+
+    Added SKIP and tweaked the test that forks childs so I does not mess
+    up with Test::More
+
+  2007-07-07 20:58:46 (r71) by avinash240
+  lib/POE/Component/Server/SimpleHTTP/PreFork.pm M;
+  t/9_prefork_maxrequestperchild.t A; t/8_post.t A;
+  lib/POE/Component/Server/SimpleHTTP/Response.pm M;
+  lib/POE/Component/Server/SimpleHTTP.pm M; t/6_stream.t M;
+  t/10_prefork_stream.t A
+
+    Merging in PUSH branch, DO NOT push out to CPAN before making sure
+    test cases are Prefork aware and 7_bad_request.t pass.
+
+  2007-06-07 16:42:36 (r60) by bingos; t/3_pod_coverage.t A
+
+    Added back t/3_pod_coverage.t 
+
+  2007-04-30 23:54:04 (r51) by avinash240; t/7_bad_request.t M
+
+    Saved bad request test, which cannot be commited til new version of
+    POE is release.
+
+  2007-04-27 22:01:30 (r50) by avinash240
+  Makefile.PL M; t/7_bad_request.t A
+
+    Committing failing test case which illustrates issue with external
+    Wheel which SimpleHTTP uses for handing off HTTP::Requests to it's
+    Got_Input handler.
+
+  2007-04-27 18:37:56 (r49) by avinash240
+  t/7_stream_dont_flush.pl D;
+  lib/POE/Component/Server/SimpleHTTP/Response.pm M; t/3_pod_coverage.t
+  D; lib/POE/Component/Server/SimpleHTTP.pm M; t/6_stream.t M; Changes M;
+  t/7_stream_dont_flush.t D
+
+    Removing push branch work from trunk. It is now under branches/push.
+
+  2007-04-26 08:40:39 (r45) by eriam
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    + new api + dont_flush option + POD !!
+
+  2007-04-26 08:29:53 (r44) by eriam
+  lib/POE/Component/Server/SimpleHTTP/Response.pm M
+
+    + dont_flush option
+
+  2007-04-26 08:29:12 (r43) by eriam; t/7_stream_dont_flush.t A
+
+    ! extension name ..
+
+  2007-04-26 08:28:30 (r42) by eriam; t/7_stream_dont_flush.pl A
+
+    + new api + option for giving the user the ability to do his
+    callbacks on his own
+
+  2007-04-26 08:27:36 (r41) by eriam; t/6_stream.t M
+
+    + new api 
+
+  2007-03-21 18:20:53 (r36) by bingos; t/3_pod_coverage.t A; Changes M
+
+    Forgot to add pod_coverage test to svn
+
+========================
+2007-03-21 18:02:05 1.23
+========================
+
+  2007-03-21 17:59:56 (r34) by avinash240
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Bumping up version number.
+
+  2007-03-21 17:54:25 (r33) by avinash240; Makefile.PL M
+
+    Fixing build requirement issues for streaming tests.
+
+========================
+2007-03-21 08:44:13 1.22
+========================
+
+  2007-03-21 08:42:20 (r31) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; MANIFEST M; Changes M
+
+    Added files to MANIFEST. Bumped version number for release. 
+
+  2007-03-20 18:39:13 (r30) by eriam; t/6_stream.t A
+
+    + test for streaming ..
+
+  2007-03-19 19:36:47 (r29) by eriam
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    + pod and modified parameters passed to the stream event (everything
+    is contained in a hash)
+
+  2007-03-19 19:34:41 (r28) by eriam; examples/stream.pl A
+
+    sample of the streaming feature
+
+  2007-03-16 10:49:44 (r27) by eriam
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    + test for streamed wheel + POST stream event to foreign session
+
+  2007-03-16 10:48:09 (r26) by eriam
+  lib/POE/Component/Server/SimpleHTTP/Response.pm M
+
+    added STREAM_SESSION to allow other POE session to register the
+    STREAM event
+
+========================
+2007-03-15 19:36:38 1.21
+========================
+
+  2007-03-15 19:35:12 (r24) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Bumped the version number for release
+
+  2007-03-08 14:27:26 (r23) by avinash240
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Updated POD in regards to the Log Handler session and how its
+    arguments changed based on malformed client requests.
+
+  2007-03-08 04:29:40 (r22) by avinash240
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Server now handles malformed requests better. Will not try to
+    dispatch to a handler when receiving a malformed request.
+
+  2007-03-06 09:25:04 (r21) by bingos; Changes M
+
+    Changes updated from release. 
+
+========================
+2007-03-06 09:17:46 1.20
+========================
+
+  2007-03-06 09:14:40 (r19) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; Changes M
+
+    Bumped the version number
+
+  2007-03-06 03:56:13 (r18) by avinash240
+  t/5_run.t M; lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Server no longer dies if it cannot find a handler for a path, now it
+    returns a response with a 404 code along with the content '404 Not
+    Found' per RFC description.
+
+  2007-03-05 00:02:24 (r17) by avinash240
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Server will now croak if it has a handler registered for the
+    directory but has a problem posting to it.
+
+========================
+2007-02-15 17:23:44 1.19
+========================
+
+  2007-02-15 17:22:33 (r14) by bingos
+  t/5_run.t A; lib/POE/Component/Server/SimpleHTTP.pm M; MANIFEST M
+
+    Added avinash240's test from branch/push 
+
+  2007-02-15 17:12:36 (r12) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; Changes M
+
+    Hacked to make the HEAP an object and added some methods
+
+========================
+2007-02-15 14:47:56 1.17
+========================
+
+  2007-02-15 14:46:02 (r10) by bingos; t/4_test_kwalitee.t A
+
+    Added kwalitee test. 
+
+  2007-02-15 14:45:34 (r9) by bingos
+  tools A; Changes.old A; lib/POE/Component/Server/SimpleHTTP.pm M;
+  META.yml D; MANIFEST M; tools/svn-log.perl A; Changes R
+
+    Added LOGHANDLER directive for general logging duties. Deprecated the
+    Changes to Changes.old, added svn logging for the future Changes
+    file. 
+
+  2007-02-05 21:36:44 (r8) by eriam
+  lib/POE/Component/Server/SimpleHTTP/Response.pm M
+
+    ! is_streaming
+
+  2007-02-03 19:02:35 (r7) by eriam
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    + is_streaming needs a 1 to be initialized
+
+  2007-02-03 19:01:03 (r6) by eriam
+  lib/POE/Component/Server/SimpleHTTP/Response.pm M
+
+    ! is_streaming can now be used to test if a response is actually in
+    streaming mode
+
+========================
+2007-01-29 15:13:13 1.16
+========================
+
+  2007-01-29 15:07:26 (r4) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; MANIFEST M; Changes M; inc D
+
+    Kwalitee fixes
+
+  2007-01-19 16:10:20 (r1) by svn
+  README A; inc/Module A; /trunk A; lib/POE/Component/Server A;
+  inc/Module/Install/WriteAll.pm A; t A;
+  lib/POE/Component/Server/SimpleHTTP/Response.pm A; t/1_load.t A;
+  lib/POE/Component/Server/SimpleHTTP.pm A; t/2_pod.t A; inc A;
+  lib/POE/Component/Server/SimpleHTTP/PreFork.pm A; examples A;
+  inc/Module/Install.pm A; /branches A;
+  lib/POE/Component/Server/SimpleHTTP A; lib/POE/Component A;
+  inc/Module/Install/Makefile.pm A; examples/server.pl A;
+  inc/Module/Install/Metadata.pm A;
+  lib/POE/Component/Server/SimpleHTTP/Connection.pm A; inc/Module/Install
+  A; lib A; MANIFEST A; Changes A; inc/Module/Install/Fetch.pm A;
+  inc/Module/Install/Can.pm A; inc/Module/Install/Win32.pm A; META.yml A;
+  Makefile.PL A; lib/POE A; inc/Module/Install/Base.pm A; /tags A
+
+    Initial repository layout
+
+==============
+End of Excerpt
+==============
