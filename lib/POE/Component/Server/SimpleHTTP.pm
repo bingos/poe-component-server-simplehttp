@@ -9,7 +9,7 @@ use vars qw($VERSION);
 
 # Initialize our version
 # $Revision: 1181 $
-$VERSION = '1.27_02';
+$VERSION = '1.27_03';
 
 # Import what we need from the POE namespace
 use POE;
@@ -95,19 +95,6 @@ sub new {
 	if ( exists $opt{'ALIAS'} and defined $opt{'ALIAS'} and length( $opt{'ALIAS'} ) ) {
 		$ALIAS = $opt{'ALIAS'};
 		delete $opt{'ALIAS'};
-	} else {
-		# Debugging info...
-		if ( DEBUG ) {
-			warn 'Using default ALIAS = SimpleHTTP';
-		}
-
-		# Set the default
-		$ALIAS = 'SimpleHTTP';
-
-		# Get rid of any lingering ALIAS
-		if ( exists $opt{'ALIAS'} ) {
-			delete $opt{'ALIAS'};
-		}
 	}
 
 	# Get the PORT
@@ -324,7 +311,8 @@ sub StartServer {
 	$_[HEAP]->{SESSION_ID} = $_[SESSION]->ID();
 
 	# Register an alias for ourself
-	$_[KERNEL]->alias_set( $_[HEAP]->{'ALIAS'} );
+	$_[KERNEL]->alias_set( $_[HEAP]->{'ALIAS'} ) if $_[HEAP]->{'ALIAS'};
+	$_[KERNEL]->refcount_increment( $_[HEAP]->{SESSION_ID}, __PACKAGE__ ) unless $_[HEAP]->{'ALIAS'};
 
 	# Massage the handlers!
 	MassageHandlers( $_[HEAP]->{'HANDLERS'} );
@@ -381,7 +369,9 @@ sub StopServer {
 	}
 
 	# Delete our alias
-	$_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} );
+	$_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} ) if $_[HEAP]->{'ALIAS'};
+	$_[KERNEL]->refcount_decrement( $_[HEAP]->{'SESSION_ID'}, __PACKAGE__ ) 
+		unless $_[HEAP]->{'ALIAS'};
 
 	# Debug stuff
 	if ( DEBUG ) {

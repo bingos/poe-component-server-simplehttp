@@ -1,3 +1,40 @@
+===========================
+2007-12-13 09:45:04 1.27_02
+===========================
+
+  2007-12-13 09:44:15 (r85) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; t/06_stream.t M; Makefile.PL
+  M
+
+    Only make PoCo-Client-HTTP a build_prereq if explicitly requested or
+    Prefork support has been requested
+
+  2007-12-13 08:22:38 (r83) by bingos
+  t/05_run.t M; t/08_post.t M; lib/POE/Component/Server/SimpleHTTP.pm M;
+  t/07_bad_request.t M
+
+    Adjusted timing of the tests.
+
+========================
+2007-12-11 17:42:57 1.26
+========================
+
+  2007-12-11 17:42:24 (r81) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Bump version for release
+
+  2007-12-11 17:40:36 (r80) by bingos
+  t/05_run.t M; t/08_post.t M; lib/POE/Component/Server/SimpleHTTP.pm M;
+  t/06_stream.t M; t/07_bad_request.t M
+
+    Refactored all tests apart from the Prefork tests to use
+    POE::Wheel::Run or equivalent instead of fork().
+
+  2007-12-11 13:42:26 (r79) by bingos; t/05_run.t M; Changes M
+
+    Refactored 05_run.t to remove fork() and use POE::Wheel::Run instead.
+
 ========================
 2007-11-29 12:11:45 1.25
 ========================
