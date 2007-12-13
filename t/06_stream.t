@@ -2,13 +2,16 @@ use strict;
 use Test::More;
 
 #plan skip_all => 'MSWin32 does not have a proper fork()' if $^O eq 'MSWin32';
+BEGIN {
+   eval { require POE::Component::Client::HTTP; };
+   plan skip_all => 'POE::Component::Client::HTTP is required for this test' if $@;
+}
 
 plan tests => 4;
 
 use HTTP::Request;
 use POE;
 use POE::Kernel;
-use POE::Component::Client::HTTP;
 use POE::Component::Server::SimpleHTTP;
 use Data::Dumper;
 
