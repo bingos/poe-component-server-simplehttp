@@ -98,6 +98,7 @@ sub _sig_chld {
 ######################################################################
 sub _tests
 {                      
+    sleep 4;
     binmode(STDOUT) if $^O eq 'MSWin32';
     my $filter = POE::Filter::Reference->new();
 

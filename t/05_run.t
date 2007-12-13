@@ -149,7 +149,7 @@ sub bonk2
 ####################################################################
 sub _tests
 {                      
-    #sleep 2;
+    sleep 4;
     binmode(STDOUT) if $^O eq 'MSWin32';
     my $filter = POE::Filter::Reference->new();
 
