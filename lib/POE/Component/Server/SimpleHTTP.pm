@@ -708,7 +708,8 @@ sub Got_Input {
 	# Add this response to the wheel
 	$_[HEAP]->{'REQUESTS'}->{ $id }->[2] = $response;
 	$_[HEAP]->{'REQUESTS'}->{ $id }->[3] = $request;
-	
+    $response->{'CONNECTION'}->{ id } = $id;
+
 	# If they have a log handler registered, send out the needed information
 	# TODO if we received a malformed request, we will not have a request object
 	# We need to figure out what we're doing because they can't always expect to have

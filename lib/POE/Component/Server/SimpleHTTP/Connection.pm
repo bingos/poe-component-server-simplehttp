@@ -99,6 +99,30 @@ sub sslcipher {
 	return shift->{'SSLCipher'};
 }
 
+sub ID {
+    return shift->{'id'};
+}
+
+sub on_close
+{
+    my( $self, @data ) = @_;
+    if( @data ) {
+        $self->{OnClose} = [ $POE::Kernel::poe_kernel->get_active_session, 
+                             @data 
+                           ];
+    }
+    else {
+        delete $self->{OnClose};
+    }
+}
+ 
+sub DESTROY {
+    my( $self ) = @_;
+    if( $self->{OnClose} ) {
+        $POE::Kernel::poe_kernel->call( @{ delete $self->{OnClose} } );
+    }
+}
+
 # End of module
 1;
 
@@ -132,6 +156,18 @@ POE::Component::Server::SimpleHTTP::Connection - Stores connection information f
 	$connection->dead();		# Returns a boolean value whether the socket is closed or not
 	$connection->ssl();		# Returns a boolean value whether the socket is SSLified or not
 	$connection->sslcipher();	# Returns the SSL Cipher type or undef if not SSL
+	$connection->ID();          # unique ID of this connection
+
+=head3 on_close
+
+    $connection->on_close( $event, @args );
+
+Calls C<$event> in the current session when the connection is closed.  You
+could use for persistent connection handling.  
+
+Note that you must make sure that C<@args> doesn't cause a circular
+reference.  Ideally, use C<$connection->ID> or some other unique value
+associated with this C<$connection>.
 
 =head2 EXPORT
 
@@ -139,9 +175,8 @@ Nothing.
 
 =head1 SEE ALSO
 
-	L<POE::Component::Server::SimpleHTTP>
-
-	L<POE::Component::Server::SimpleHTTP::Response>
+L<POE::Component::Server::SimpleHTTP>,
+L<POE::Component::Server::SimpleHTTP::Response>
 
 =head1 AUTHOR
 

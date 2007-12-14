@@ -3,7 +3,7 @@ use Test::More;
 
 #plan skip_all => 'MSWin32 does not have a proper fork()' if $^O eq 'MSWin32';
 
-plan tests => 14;
+plan tests => 22;
 
 use LWP::UserAgent;
 use LWP::ConnCache;
@@ -51,15 +51,16 @@ POE::Session->create(
 						   #$poe_kernel->delay( '_tests', 8 );
 						   return;
 					   },
-			'_tests'	=> \&_start_tests,
+                        '_tests'        => \&_start_tests,
                         'TOP'           => \&top,
                         'HONK'          => \&honk,
                         'BONK'          => \&bonk,
                        	'BONK2'         => \&bonk2,
-			'_close'	=> \&_close,
-			'_stdout'	=> \&_stdout,
-			'_stderr'	=> \&_stderr,
-			'_sig_chld'     => \&_sig_chld,
+                        '_close'        => \&_close,
+                        '_stdout'       => \&_stdout,
+                        '_stderr'       => \&_stderr,
+                        '_sig_chld'     => \&_sig_chld,
+                        'on_close'      => \&on_close,
                 },
 );
 $poe_kernel->run;
@@ -115,6 +116,8 @@ sub top
 sub honk
 {
     my ($request, $response) = @_[ARG0, ARG1];
+    my $c = $response->connection;
+    $c->on_close( 'on_close', [ $c->ID, "something" ], "more" );
     $response->code(200);
     $response->content_type('text/plain');
     $response->content("this is honk");
@@ -122,9 +125,20 @@ sub honk
 }
 
 #######################################
+sub on_close
+{
+    my( $args, $more ) = @_[ARG0, ARG1];
+    ok( ($args and $more), "on_close with 2 arguments" );
+    ok( $args->[0], "First is the wheel ID=$args->[0]" );
+    is( $args->[1], 'something', " ... with some extra data" );
+    is( $more, 'more', "Second is a string" );
+}
+
+#######################################
 sub bonk
 {
     my ($request, $response) = @_[ARG0, ARG1];
+    fail( "bonk should never be called" );
     $response->code(200);
     $response->content_type('text/plain');
     $response->content("this is bonk");
