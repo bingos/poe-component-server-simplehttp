@@ -266,6 +266,9 @@ sub new {
 
 			# Kill the connection!
 			'CLOSE'		=>	\&Request_Close,
+
+            # Set close handler for a connection
+            'SETCLOSEHANDLER' => \&SetCloseHandler
 		},
 
 		# Set up the heap for ourself
@@ -788,6 +791,7 @@ sub Got_Flush {
 		$_[HEAP]->{'REQUESTS'}->{ $id }->[0]->shutdown_input();
 		$_[HEAP]->{'REQUESTS'}->{ $id }->[0]->shutdown_output();
 
+      # TODO: check for keep-alive
 		# Delete the wheel
 		# Tracked down by Paul Visscher
 		delete $_[HEAP]->{'REQUESTS'}->{ $id }->[0];
@@ -1109,6 +1113,35 @@ sub Register {
    
    return $session->register_state( $state, $code_ref );
 }
+
+# SETCLOSEHANDLER
+sub SetCloseHandler
+{
+    my( $heap, $sender ) = @_[ HEAP, SENDER ];
+    my( $connection, $state, @params ) = @_[ ARG0..$#_ ];
+
+
+    # turn connection ID into the connection object
+    unless( ref $connection ) {         
+        my $id = $connection;
+        if( $heap->{'REQUESTS'}->{$id} and
+                $heap->{'REQUESTS'}->{$id}->[2] ) {
+            $connection = $_[HEAP]->{'REQUESTS'}->{ $id }->[2]->connection;
+        }
+        unless( ref $connection ) {
+            die "Can't find connection object for request $id";
+        }
+    }
+
+    if( $state ) {
+        $connection->_on_close( $sender, $state, @params );
+    }
+    else {
+        $connection->_on_close( $sender );
+    }
+}
+
+
 
 # End of module
 1;
@@ -1433,6 +1466,25 @@ SimpleHTTP is so simple, there are only 8 events available.
 	This event accepts only one argument: pointer to HANDLERS array
 
 	BEWARE: if there is an error in the HANDLERS, SimpleHTTP will die!
+
+=head3 C<SETCLOSEHANDLER>
+
+    $_[KERNEL]->call( $_[SENDER], 'SETCLOSEHANDLER', $connection, 
+                      $event, @args );
+
+Calls C<$event> in the current session when C<$connection> is closed.  You
+could use for persistent connection handling.  
+
+Multiple session may register close handlers.
+
+Calling SETCLOSEHANDLER without C<$event> to remove the current session's
+handler:
+
+   $_[KERNEL]->call( $_[SENDER], 'SETCLOSEHANDLER', $connection );
+
+Note that you must make sure that C<@args> doesn't cause a circular
+reference.  Ideally, use C<$connection->ID> or some other unique value
+associated with this C<$connection>.
 
 =item C<STARTLISTEN>
 

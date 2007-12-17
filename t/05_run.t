@@ -117,7 +117,8 @@ sub honk
 {
     my ($request, $response) = @_[ARG0, ARG1];
     my $c = $response->connection;
-    $c->on_close( 'on_close', [ $c->ID, "something" ], "more" );
+    $_[KERNEL]->call( $_[SENDER], 'SETCLOSEHANDLER', $c->ID, 
+                        'on_close', [ $c->ID, "something" ], "more" );
     $response->code(200);
     $response->content_type('text/plain');
     $response->content("this is honk");

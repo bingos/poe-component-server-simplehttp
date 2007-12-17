@@ -88,7 +88,7 @@ sub GOT_MAIN {
    my $c = $response->connection;
    $STREAMS{ $c->ID }=1;
 
-   $c->on_close( 'on_close', $c->ID );
+   $_[KERNEL]->call( $_[SENDER], 'SETCLOSEHANDLER', $c, 'on_close', $c->ID );
     
     # We are done!
    $kernel->yield('GOT_STREAM', $response);
