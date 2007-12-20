@@ -205,6 +205,11 @@ sub new {
 		}
 	}
 
+    my $KEEPALIVE = 0;
+    if ( exists $opt{'KEEPALIVE'} ) {
+        $KEEPALIVE = delete $opt{'KEEPALIVE'};
+    }
+
 	# Anything left over is unrecognized
 	if ( DEBUG ) {
 		if ( keys %opt > 0 ) {
@@ -225,6 +230,7 @@ sub new {
 			'LOGHANDLER'   =>	$LOGHANDLER,
 			'SETUPHANDLER' =>	$SETUPHANDLER,
 			'ERRORHANDLER' =>	$ERRORHANDLER,
+            'KEEPALIVE'    =>   $KEEPALIVE
 	};
 
 	my $self = bless $data, $type;
@@ -359,17 +365,20 @@ sub StopServer {
 	}
 
 	# Forcibly close all sockets that are open
-	foreach my $conn ( keys %{ $_[HEAP]->{'REQUESTS'} } ) {
-		# Can't call method "shutdown_input" on an undefined value at
-		# /usr/lib/perl5/site_perl/5.8.2/POE/Component/Server/SimpleHTTP.pm line 323.
-		if ( defined $_[HEAP]->{'REQUESTS'}->{ $conn }->[0] and defined $_[HEAP]->{'REQUESTS'}->{ $conn }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
-			$_[HEAP]->{'REQUESTS'}->{ $conn }->[0]->shutdown_input;
-			$_[HEAP]->{'REQUESTS'}->{ $conn }->[0]->shutdown_output;
-		}
-
-		# Delete this request
-		delete $_[HEAP]->{'REQUESTS'}->{ $conn };
-	}
+    foreach my $S ( $_[HEAP]->{'REQUESTS'}, $_[HEAP]->{'CONNECTIONS'} ) {
+        foreach my $conn ( keys %$S ) {
+    		# Can't call method "shutdown_input" on an undefined value at
+	    	# /usr/lib/perl5/site_perl/5.8.2/POE/Component/Server/SimpleHTTP.pm line 323.
+		    if ( defined $S->{ $conn }->[0] and 
+                    defined $S->{ $conn }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
+    			$S->{ $conn }->[0]->shutdown_input;
+	    		$S->{ $conn }->[0]->shutdown_output;
+		    }
+            # Delete this request
+		    delete $S->{ $conn };
+	    }
+    }
+    
 
 	# Delete our alias
 	$_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} ) if $_[HEAP]->{'ALIAS'};
@@ -587,6 +596,12 @@ sub Got_Connection {
 		'ErrorEvent'	=>	'Got_Error',
 	);
 
+    if( DEBUG and keys %{ $_[HEAP]->{CONNECTIONS} } ) {
+        # use Data::Dumper;
+        warn "conn id=", $wheel->ID, " [", 
+            join( ', ', keys %{ $_[HEAP]->{CONNECTIONS} }), "]";
+    }
+
 	# Save this wheel!
 	# 0 = wheel, 1 = Output done?, 2 = SimpleHTTP::Response object
 	$_[HEAP]->{'REQUESTS'}->{ $wheel->ID } = [ $wheel, 0, undef ];
@@ -605,6 +620,18 @@ sub Got_Input {
 	# ARG0 = HTTP::Request object, ARG1 = Wheel ID
 	my( $request, $id ) = @_[ ARG0, ARG1 ];
 
+    my $connection;
+
+    # Was this request Keep-Alive?
+    if( $_[HEAP]->{'CONNECTIONS'}->{ $id } ) {
+        my $c = delete $_[HEAP]->{'CONNECTIONS'}->{ $id };
+        $_[HEAP]->{'REQUESTS'}->{ $id } = [ $c->[0], 0, undef ];
+        $connection = $c->[1];
+        if ( DEBUG ) {
+            warn "Keep-alive id=$id next request...";
+        }
+    }
+
 	# Quick check to see if the socket died already...
 	# Initially reported by Tim Wood
 	if ( ! defined $_[HEAP]->{'REQUESTS'}->{ $id }->[0] or ! defined $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
@@ -620,7 +647,21 @@ sub Got_Input {
 		return;
 	}
 
-	# The HTTP::Response object, the path
+	if( $connection ) {
+        # connection was kept-alive
+	}
+	# Directly access POE::Wheel::ReadWrite's HANDLE_INPUT -> to get the socket itself
+	# Hmm, if we are SSL, then have to do an extra step!
+	elsif( defined $_[HEAP]->{'SSLKEYCERT'} ) {
+		$connection = 
+			POE::Component::Server::SimpleHTTP::Connection->new( SSLify_GetSocket( $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) );
+	}
+	else {
+		$connection = 
+			POE::Component::Server::SimpleHTTP::Connection->new( $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] );
+	}
+
+    # The HTTP::Response object, the path
 	my ( $response, $path, $malformed_req );
 
 	# Check if it is HTTP::Request or Response
@@ -640,13 +681,7 @@ sub Got_Input {
 		bless( $response, 'POE::Component::Server::SimpleHTTP::Response' );
 		$response->{'WHEEL_ID'} = $id;
 
-		# Directly access POE::Wheel::ReadWrite's HANDLE_INPUT -> to get the socket itself
-		# Hmm, if we are SSL, then have to do an extra step!
-		if ( defined $_[HEAP]->{'SSLKEYCERT'} ) {
-			$response->{'CONNECTION'} = POE::Component::Server::SimpleHTTP::Connection->new( SSLify_GetSocket( $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) );
-		} else {
-			$response->{'CONNECTION'} = POE::Component::Server::SimpleHTTP::Connection->new( $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] );
-		}
+        $response->{'CONNECTION'} = $connection;
 
 		# Set the path to an empty string
 		$path = '';
@@ -665,19 +700,9 @@ sub Got_Input {
 		}
 
 		# Get the response
-		# Directly access POE::Wheel::ReadWrite's HANDLE_INPUT -> to get the socket itself
-		# Hmm, if we are SSL, then have to do an extra step!
-		if ( defined $_[HEAP]->{'SSLKEYCERT'} ) {
-			$response = POE::Component::Server::SimpleHTTP::Response->new(
-				$id,
-				POE::Component::Server::SimpleHTTP::Connection->new( SSLify_GetSocket( $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) )
+        $response = POE::Component::Server::SimpleHTTP::Response->new(
+				$id, $connection
 			);
-		} else {
-			$response = POE::Component::Server::SimpleHTTP::Response->new(
-				$id,
-				POE::Component::Server::SimpleHTTP::Connection->new( $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] )
-			);
-		}
 
 		# Stuff the default headers
 		if ( keys( %{ $_[HEAP]->{'HEADERS'} } ) != 0 ) {
@@ -787,15 +812,26 @@ sub Got_Flush {
 	}
 	# Check if we are shutting down
 	elsif ( $_[HEAP]->{'REQUESTS'}->{ $id }->[1] == 1 ) {
-		# Shutdown read/write on the wheel
-		$_[HEAP]->{'REQUESTS'}->{ $id }->[0]->shutdown_input();
-		$_[HEAP]->{'REQUESTS'}->{ $id }->[0]->shutdown_output();
 
-      # TODO: check for keep-alive
-		# Delete the wheel
-		# Tracked down by Paul Visscher
+        if( Must_KeepAlive( $_[HEAP], $id ) ) {
+            if ( DEBUG ) {
+                warn "Keep-alive id=$id ...";
+            }
+            $_[HEAP]->{'CONNECTIONS'}->{ $id } = [ 
+                      $_[HEAP]->{'REQUESTS'}->{ $id }->[0],   # wheel
+                      $_[HEAP]->{'REQUESTS'}->{ $id }->[2]->connection
+                    ];
+        }
+        else {
+    		# Shutdown read/write on the wheel
+	    	$_[HEAP]->{'REQUESTS'}->{ $id }->[0]->shutdown_input();
+		    $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->shutdown_output();
+        }
+
+        # Delete the wheel
+	    # Tracked down by Paul Visscher
 		delete $_[HEAP]->{'REQUESTS'}->{ $id }->[0];
-		delete $_[HEAP]->{'REQUESTS'}->{ $id };
+    	delete $_[HEAP]->{'REQUESTS'}->{ $id };
 	}
 	else {
 		# Ignore this, eh?
@@ -807,7 +843,8 @@ sub Got_Flush {
 	# Alright, do we have to shutdown?
 	if ( ! exists $_[HEAP]->{'SOCKETFACTORY'} ) {
 		# Check to see if we have any more requests
-		if ( keys( %{ $_[HEAP]->{'REQUESTS'} } ) == 0 ) {
+		if ( keys( %{ $_[HEAP]->{'REQUESTS'} } ) == 0 and
+             keys( %{ $_[HEAP]->{'CONNECTIONS'} } ) == 0 ) {
 			# Shutdown!
 			$_[KERNEL]->yield( 'SHUTDOWN' );
 		}
@@ -815,6 +852,31 @@ sub Got_Flush {
 
 	# Success!
 	return 1;
+}
+
+
+# should we keep-alive the connection?
+sub Must_KeepAlive
+{
+    my( $heap, $id ) = @_;
+
+    return unless $heap->{'KEEPALIVE'};
+
+    my $resp = $heap->{'REQUESTS'}->{ $id }->[2];
+    my $req  = $heap->{'REQUESTS'}->{ $id }->[3];
+
+    # error = close
+    return 0 if $resp->is_error;
+
+    # Connection is a comma-seperated header
+    my $conn = lc $req->header( 'Connection' );
+    return 0 if ",$conn," =~ /,\s*close\s*,/;
+    $conn = lc $resp->header( 'Connection' );
+    return 0 if ",$conn," =~ /,\s*close\s*,/;
+
+    # HTTP/1.1 = keep
+    return 1 if $req->protocol eq 'HTTP/1.1';
+    return 0;
 }
 
 # Got some sort of error from ReadWrite
@@ -829,11 +891,21 @@ sub Got_Error {
 			warn "Wheel $id generated $operation error $errnum: $errstr\n";
 		}
 
-		# Make the client dead
-		$_[HEAP]->{'REQUESTS'}->{ $id }->[2]->{'CONNECTION'}->{'DIED'} = 1;
-
-		# Delete this connection
-		delete $_[HEAP]->{'REQUESTS'}->{ $id };
+        my $connection;
+        if( $_[HEAP]->{'CONNECTIONS'}{ $id } ) {
+            my $c = delete $_[HEAP]->{'CONNECTIONS'}{ $id };
+            $connection = $c->[1];
+            delete $c->[0];
+        }
+        else {
+            $connection = $_[HEAP]->{'REQUESTS'}->{ $id }->[2]->{'CONNECTION'};
+    		# Delete this connection
+	    	delete $_[HEAP]->{'REQUESTS'}->{ $id }->[0];
+	    	delete $_[HEAP]->{'REQUESTS'}->{ $id };
+        }
+            
+		# Mark the client dead
+		$connection->{'DIED'} = 1;
 	}
 
 	# Success!
@@ -894,22 +966,8 @@ sub Request_Output {
 		return;
 	}
 
-	# Set the date if needed
-	if ( ! $response->header( 'Date' ) ) {
-		$response->header( 'Date', time2str( time ) );
-	}
+    Fix_Headers( $_[HEAP], $response );
 
-	# Set the Content-Length if needed
-	if ( ! $response->header( 'Content-Length' ) ) {
-		use bytes;
-		$response->header( 'Content-Length', length( $response->content ) );
-	}
-
-	# Set the Content-Type if needed
-	if ( ! $response->header( 'Content-Type' ) ) {
-		$response->header( 'Content-Type', 'text/html' );
-	}
-   
    # Send it out!
    $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->put( $response );
 
@@ -997,15 +1055,7 @@ sub Stream_Output {
       return;
    }
    
-   # Set the date if needed
-   if ( ! $response->header( 'Date' ) ) {
-      $response->header( 'Date', time2str( time ) );
-   }
-   
-   # Set the Content-Type if needed
-   if ( ! $response->header( 'Content-Type' ) ) {
-      $response->header( 'Content-Type', 'text/html' );
-   }
+   Fix_Headers( $_[HEAP], $response, 1 );
 
    # Preliminary check
    if ( ! defined $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0] 
@@ -1054,6 +1104,35 @@ sub Stream_Output {
 	return 1;
 }
 
+# Add required headers to a response
+sub Fix_Headers
+{
+   my( $heap, $response, $stream ) = @_;
+    # Set the date if needed
+    if ( ! $response->header( 'Date' ) ) {
+        $response->header( 'Date', time2str( time ) );
+    }
+   
+	# Set the Content-Length if needed
+	if ( not $stream and not defined $response->header( 'Content-Length' )  ) {
+		use bytes;
+		$response->header( 'Content-Length', length( $response->content ) );
+	}
+
+	# Set the Content-Type if needed
+	if ( ! $response->header( 'Content-Type' ) ) {
+		$response->header( 'Content-Type', 'text/plain' );
+	}
+
+    if( ! $response->protocol ) {
+        my $request = $heap->{'REQUESTS'}->{ $response->_WHEEL }->[3];
+        unless( $request->method eq 'HEAD' ) {
+            $response->protocol( $request->protocol );
+        }
+    }
+}
+
+
 # Closes the connection
 sub Request_Close {
 	# ARG0 = HTTP::Response object
@@ -1071,6 +1150,12 @@ sub Request_Close {
 
 	# Get the wheel ID
 	my $id = $response->_WHEEL;
+
+    if( $_[HEAP]->{'CONNECTIONS'}->{ $id } ) {
+        my $c = delete $_[HEAP]->{'CONNECTIONS'}->{ $id };
+        $_[HEAP]->{'REQUESTS'}->{ $id } = [ $c->[0], 0, undef ];
+    }        
+
 
 	# Check if the wheel exists ( sometimes it gets closed by the client, but the application doesn't know that... )
 	if ( ! exists $_[HEAP]->{'REQUESTS'}->{ $id } ) {
@@ -1120,11 +1205,13 @@ sub SetCloseHandler
     my( $heap, $sender ) = @_[ HEAP, SENDER ];
     my( $connection, $state, @params ) = @_[ ARG0..$#_ ];
 
-
     # turn connection ID into the connection object
     unless( ref $connection ) {         
         my $id = $connection;
-        if( $heap->{'REQUESTS'}->{$id} and
+        if( $heap->{'CONNECTIONS'}->{$id} ) {
+            $connection = $heap->{'CONNECTIONS'}->{$id}->[1];
+        }
+        elsif( $heap->{'REQUESTS'}->{$id} and
                 $heap->{'REQUESTS'}->{$id}->[2] ) {
             $connection = $_[HEAP]->{'REQUESTS'}->{ $id }->[2]->connection;
         }
@@ -1389,6 +1476,16 @@ is a "catch-all" DIR regex like '.*', it will catch the errors, and only that on
 NOTE: The only way SimpleHTTP will leak memory ( hopefully heh ) is if you discard the SimpleHTTP::Response object without sending it
 back to SimpleHTTP via the DONE/CLOSE events, so never do that!
 
+=item C<KEEPALIVE>
+
+Set to true to enable HTTP keep-alive support.  Connections will be
+kept alive until the client closes the connection.  All HTTP/1.1 connections
+are kept-open, unless you set the response C<Connection> header to C<close>.
+
+    $response->header( Connection => 'close' );
+
+If you want more control, use L<POE::Component::Server::HTTP::KeepAlive>.
+
 =item C<LOGHANDLER>
 
 Expects a hashref with the following key, values:
@@ -1467,7 +1564,7 @@ SimpleHTTP is so simple, there are only 8 events available.
 
 	BEWARE: if there is an error in the HANDLERS, SimpleHTTP will die!
 
-=head3 C<SETCLOSEHANDLER>
+=item C<SETCLOSEHANDLER>
 
     $_[KERNEL]->call( $_[SENDER], 'SETCLOSEHANDLER', $connection, 
                       $event, @args );
@@ -1482,7 +1579,7 @@ handler:
 
    $_[KERNEL]->call( $_[SENDER], 'SETCLOSEHANDLER', $connection );
 
-Note that you must make sure that C<@args> doesn't cause a circular
+You B<must> make sure that C<@args> doesn't cause a circular
 reference.  Ideally, use C<$connection->ID> or some other unique value
 associated with this C<$connection>.
 

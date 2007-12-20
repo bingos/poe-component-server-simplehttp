@@ -27,4 +27,5 @@ t/07_bad_request.t
 t/08_post.t
 t/09_prefork_maxrequestperchild.t
 t/10_prefork_stream.t
+t/11_keepalive.t
 tools/svn-log.perl
