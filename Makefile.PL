@@ -38,4 +38,9 @@ if ( $value =~ /^Y$/i ) {
    requires 'IPC::Shareable' => '0';
    build_requires   'POE::Component::Client::HTTP' =>    0;
 }
+
+# Sanity check
+eval { require IPC::Shareable; };
+build_requires 'POE::Component::Client::HTTP' =>    0 unless $@;
+
 WriteAll();

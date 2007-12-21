@@ -65,6 +65,7 @@ if ($pid)  # we are parent
          Alias     => 'ua',
          Protocol  => 'HTTP/1.1', 
          From      => 'test@tester',
+	 Proxy     => q{},
       );
    
       my $request = HTTP::Request->new(GET => "http://$IP:$PORT/");

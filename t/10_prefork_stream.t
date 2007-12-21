@@ -61,6 +61,7 @@ if ($pid)  # we are parent
          Protocol  => 'HTTP/1.1', 
          From      => 'test@tester',
          Streaming => 50,
+	 Proxy     => q{},
       );
    
       my $request = HTTP::Request->new(GET => "http://$IP:$PORT/");

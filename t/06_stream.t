@@ -42,6 +42,7 @@ POE::Component::Client::HTTP->spawn(
          Protocol  => 'HTTP/1.1', 
          From      => 'test@tester',
          Streaming => 100,
+	 Proxy     => q{},
 );
 
 POE::Session->create(
