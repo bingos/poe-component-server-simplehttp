@@ -9,7 +9,7 @@ use vars qw($VERSION);
 
 # Initialize our version
 # $Revision: 1181 $
-$VERSION = '1.30';
+$VERSION = '1.32';
 
 # Import what we need from the POE namespace
 use POE;
@@ -1126,6 +1126,7 @@ sub Fix_Headers
 
     if( ! $response->protocol ) {
         my $request = $heap->{'REQUESTS'}->{ $response->_WHEEL }->[3];
+	return unless $request and $request->isa('HTTP::Request');
         unless( $request->method eq 'HEAD' ) {
             $response->protocol( $request->protocol );
         }

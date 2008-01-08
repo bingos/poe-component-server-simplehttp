@@ -1,4 +1,48 @@
 ========================
+2007-12-21 16:59:05 1.30
+========================
+
+  2007-12-21 16:56:40 (r96) by bingos
+  t/09_prefork_maxrequestperchild.t M;
+  lib/POE/Component/Server/SimpleHTTP.pm M; t/06_stream.t M; Makefile.PL
+  M; Changes M; t/10_prefork_stream.t M
+
+    Minor amendments prior to CPAN Release
+
+  2007-12-20 02:28:51 (r95) by leolo; Makefile.PL M
+
+    Added build_requires LWP::ConnCache
+
+  2007-12-20 02:27:49 (r94) by leolo
+  lib/POE/Component/Server/SimpleHTTP.pm M; MANIFEST M; t/11_keepalive.t
+  A
+
+    Added HTTP/1.1 keep-alive support. 
+
+    - Off by default, turn on with KEEPALIVE=>1
+
+    - Added t/11_keepalive.t to test above Created Fix_Headers() which
+    adds default response headers for both stream
+
+    and normal responses. Responses to HEAD requests shouldn't have
+    Content-Length set! Default content-type is now text/plain
+
+  2007-12-17 15:26:10 (r93) by leolo
+  t/05_run.t M; lib/POE/Component/Server/SimpleHTTP/Connection.pm M;
+  lib/POE/Component/Server/SimpleHTTP.pm M; t/06_stream.t M
+
+    Changed the on_close interface to 'SETCLOSEHANDLER' which is closer
+    to the normal SimpleHTTP interface. 
+
+  2007-12-14 20:41:39 (r92) by leolo
+  t/05_run.t M; lib/POE/Component/Server/SimpleHTTP/Connection.pm M;
+  lib/POE/Component/Server/SimpleHTTP.pm M; t/06_stream.t M
+
+    Added Server::SimpleHTTP::Connection->ID Added
+    Server::SimpleHTTP::Connection->on_close Modified t/05_run.t and
+    t/06_stream.t to test the above Documented the above
+
+========================
 2007-12-13 13:56:17 1.28
 ========================
 
