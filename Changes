@@ -1,4 +1,13 @@
 ========================
+2008-01-08 10:13:14 1.32
+========================
+
+  2008-01-08 10:11:41 (r98) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; Changes M
+
+    Fixed problem with bad requests, reported by agaran
+
+========================
 2007-12-21 16:59:05 1.30
 ========================
 

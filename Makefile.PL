@@ -11,7 +11,7 @@ abstract_from 'lib/POE/Component/Server/SimpleHTTP.pm';
 requires    'HTTP::Date'       =>    0;
 requires    'Carp'             =>    0;
 requires    'Sys::Hostname'    =>    0;
-requires    'POE'              =>    '0.38';
+requires    'POE'              =>    '0.9999';
 requires    'Storable'         =>    0;
 requires    'Socket'           =>    0;
 requires    'HTTP::Request'    =>    0;
