@@ -9,7 +9,7 @@ use vars qw($VERSION);
 
 # Initialize our version
 # $Revision: 1181 $
-$VERSION = '1.34';
+$VERSION = '1.36';
 
 # Import what we need from the POE namespace
 use POE;
@@ -761,8 +761,13 @@ sub Got_Input {
 	# If we received a malformed request then
 	# let's not try to dispatch to a handler
 	if( $malformed_req ) {
-        # Just push out the response we got from POE::Filter::HTTPD saying your request was bad
-        $_[KERNEL]->yield('DONE', $response);
+		# Just push out the response we got from POE::Filter::HTTPD saying your request was bad
+		POE::Kernel->post( 
+			$_[HEAP]->{ERRORHANDLER}->{SESSION}, 
+			$_[HEAP]->{ERRORHANDLER}->{EVENT}, 
+			'BadRequest (by POE::Filter::HTTPD)', $response->connection->remote_ip()
+		);
+		$_[KERNEL]->yield('DONE', $response);
 	} else {
 	   # Find which handler will handle this one
 		foreach my $handler ( @{ $_[HEAP]->{'HANDLERS'} } ) {
