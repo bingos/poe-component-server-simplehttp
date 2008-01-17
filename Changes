@@ -1,4 +1,13 @@
 ========================
+2008-01-14 21:26:41 1.36
+========================
+
+  2008-01-14 21:25:39 (r102) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; Changes M
+
+    Applied a patch from Maciej Pijanka (agaran) 
+
+========================
 2008-01-09 15:29:51 1.34
 ========================
 
