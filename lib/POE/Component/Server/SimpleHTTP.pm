@@ -9,7 +9,7 @@ use vars qw($VERSION);
 
 # Initialize our version
 # $Revision: 1181 $
-$VERSION = '1.38';
+$VERSION = '1.40';
 
 # Import what we need from the POE namespace
 use POE;
@@ -54,6 +54,7 @@ sub new {
 
 	# The options hash
 	my %opt = @_;
+	$opt{uc $_} = delete $opt{$_} for keys %opt; # Fix that pesky uppercase option stuff.
 
 	# Our own options
 	my ( $ALIAS, $ADDRESS, $PORT, $HOSTNAME, $HEADERS, $HANDLERS, $SSLKEYCERT, $LOGHANDLER, $ERRORHANDLER, $SETUPHANDLER );
@@ -531,6 +532,9 @@ sub MassageHandlers {
 	while ( $count < scalar( @$handler ) ) {
 		# Must be ref to hash
 		if ( ref $handler->[ $count ] and ref( $handler->[ $count ] ) eq 'HASH' ) {
+			# Make sure all the keys are uppercase
+			$handler->[ $count ]->{uc $_} = delete $handler->[ $count ]->{$_} 
+				for keys %{ $handler->[ $count ] };
 			# Make sure it got the 3 parts necessary
 			if ( ! exists $handler->[ $count ]->{'SESSION'} or ! defined $handler->[ $count ]->{'SESSION'} ) {
 				croak( "HANDLER number $count does not have a SESSION argument!" );
@@ -1675,10 +1679,6 @@ The dont_flush option is there to be able to control the frequency of flushes
 to the client. 
 
 =head2 SimpleHTTP Notes
-
-This module is very picky about capitalization!
-
-All of the options are uppercase, to avoid confusion.
 
 You can enable debugging mode by doing this:
 

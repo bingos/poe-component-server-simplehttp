@@ -1,4 +1,14 @@
 ========================
+2008-01-17 14:53:21 1.38
+========================
+
+  2008-01-17 14:45:39 (r104) by bingos
+  t/09_prefork_maxrequestperchild.t M;
+  lib/POE/Component/Server/SimpleHTTP.pm M; Changes M
+
+    Amended the test count in 09_prefork test, reported by UltraDM. 
+
+========================
 2008-01-14 21:26:41 1.36
 ========================
 
