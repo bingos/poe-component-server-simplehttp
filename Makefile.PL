@@ -22,7 +22,7 @@ build_requires   'LWP::UserAgent'               =>    0;
 build_requires   'LWP::ConnCache'               =>    0;
 
 my $value = prompt( 'Do you want to test streaming ( requires POE::Component::Client::HTTP ) [y/N]?', 'N' );
-build_requires   'POE::Component::Client::HTTP' =>    0 if $value =~ /^Y$/i;
+build_requires   'POE::Component::Client::HTTP' => 0.82 if $value =~ /^Y$/i;
 
 # Ask users if they want SSL support
 $value = prompt( 'Do you want SSL support ( requires POE::Component::SSLify ) [y/N]?', 'N' );
@@ -36,11 +36,11 @@ $value = prompt( 'Do you want PreFork support ( requires IPC::Shareable ) [y/N]?
 # Add to the prereqs IPC::Shareable?
 if ( $value =~ /^Y$/i ) {
    requires 'IPC::Shareable' => '0';
-   build_requires   'POE::Component::Client::HTTP' =>    0;
+   build_requires   'POE::Component::Client::HTTP' => 0.82;
 }
 
 # Sanity check
 eval { require IPC::Shareable; };
-build_requires 'POE::Component::Client::HTTP' =>    0 unless $@;
+build_requires 'POE::Component::Client::HTTP' => 0.82 unless $@;
 
 WriteAll();
