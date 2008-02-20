@@ -1009,7 +1009,7 @@ sub Request_Output {
 	warn("I had a problem posting to event '", 
 		$_[HEAP]->{'LOG2HANDLER'}->{'EVENT'}, 
 		"' of the log handler alias '", 
-		$_[HEAP]->{'LOG2HANDLE'}->{'SESSION'}, 
+		$_[HEAP]->{'LOG2HANDLER'}->{'SESSION'}, 
 		"'. As reported by Kernel: '$!', perhaps the alias is spelled incorrectly for this handler?") 
 	if $!;
 
