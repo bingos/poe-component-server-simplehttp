@@ -57,7 +57,7 @@ sub new {
 	$opt{uc $_} = delete $opt{$_} for keys %opt; # Fix that pesky uppercase option stuff.
 
 	# Our own options
-	my ( $ALIAS, $ADDRESS, $PORT, $HOSTNAME, $HEADERS, $HANDLERS, $SSLKEYCERT, $LOGHANDLER, $ERRORHANDLER, $SETUPHANDLER );
+	my ( $ALIAS, $ADDRESS, $PORT, $HOSTNAME, $HEADERS, $HANDLERS, $SSLKEYCERT, $LOGHANDLER, $ERRORHANDLER, $SETUPHANDLER, $LOG2HANDLER );
 
 	# You could say I should do this: $Stuff = delete $opt{'Stuff'}
 	# But, that kind of behavior is not defined, so I would not trust it...
@@ -193,6 +193,19 @@ sub new {
 		}
 	}
 
+	if ( exists $opt{'LOG2HANDLER'} and defined $opt{'LOG2HANDLER'} ) {
+		if ( ref $opt{'LOG2HANDLER'} and ref $opt{'LOG2HANDLER'} eq 'HASH' ) {
+			$LOG2HANDLER = delete $opt{'LOG2HANDLER'};
+			croak( 'LOG2HANDLER does not have a SESSION attribute' ) 
+			  unless $LOG2HANDLER->{'SESSION'};
+			croak( 'LOG2HANDLER does not have an EVENT attribute' ) 
+			  unless $LOG2HANDLER->{'EVENT'};
+		}
+		else {
+			croak( 'LOG2HANDLER must be a reference to an HASH!' );
+		}
+	}
+
 	if ( exists $opt{'SETUPHANDLER'} and defined $opt{'SETUPHANDLER'} ) {
 		if ( ref $opt{'SETUPHANDLER'} and ref $opt{'SETUPHANDLER'} eq 'HASH' ) {
 			$SETUPHANDLER = delete $opt{'SETUPHANDLER'};
@@ -229,6 +242,7 @@ sub new {
 			'RETRIES'	   =>	0,
 			'SSLKEYCERT'   =>	$SSLKEYCERT,
 			'LOGHANDLER'   =>	$LOGHANDLER,
+			'LOG2HANDLER'   =>	$LOG2HANDLER,
 			'SETUPHANDLER' =>	$SETUPHANDLER,
 			'ERRORHANDLER' =>	$ERRORHANDLER,
             'KEEPALIVE'    =>   $KEEPALIVE
@@ -983,6 +997,23 @@ sub Request_Output {
    # Mark this socket done
    $_[HEAP]->{'REQUESTS'}->{ $id }->[1] = 1;
 
+	# Log FINALLY If they have a logFinal handler registered, send out the needed information
+	$_[KERNEL]->call( 
+		$_[HEAP]->{'LOG2HANDLER'}->{'SESSION'}, 
+		$_[HEAP]->{'LOG2HANDLER'}->{'EVENT'}, 
+		$_[HEAP]->{'REQUESTS'}{ $id }[3],
+		$response) 
+	if $_[HEAP]->{'LOG2HANDLER'};
+	
+	# Warn if we had a problem dispatching to the log handler above
+	warn("I had a problem posting to event '", 
+		$_[HEAP]->{'LOG2HANDLER'}->{'EVENT'}, 
+		"' of the log handler alias '", 
+		$_[HEAP]->{'LOG2HANDLE'}->{'SESSION'}, 
+		"'. As reported by Kernel: '$!', perhaps the alias is spelled incorrectly for this handler?") 
+	if $!;
+
+
    # Debug stuff
    if ( DEBUG ) {
            warn "Completed with Wheel ID $id";
@@ -1285,6 +1316,10 @@ POE::Component::Server::SimpleHTTP - Perl extension to serve HTTP requests in PO
 		'LOGHANDLER' => { 'SESSION' => 'HTTP_GET',
 				  'EVENT'   => 'GOT_LOG',
 		},
+		
+		'LOG2HANDLER' => { 'SESSION' => 'HTTP_GET',
+				  'EVENT'   => 'POSTLOG',
+		},
 
 		# In the testing phase...
 		'SSLKEYCERT'	=>	[ 'public-key.pem', 'public-cert.pem' ],
@@ -1506,12 +1541,40 @@ EVENT	->	The event to trigger
 
 You will receive an event for each request to the server from clients.  Malformed client requests will not be passed into the handler.  Instead
 undef will be passed.
+Event is called before ANY content handler is called. 
 
 The event will have the following parameters:
 
 ARG0 -> HTTP::Request object/undef if client request was malformed.
 
 ARG1 -> the IP address of the client
+
+=item C<LOG2HANDLER>
+
+Expect a hashref with the following key, valyes:
+
+SESSION	->	The session to send the input
+
+EVENT	->	The event to trigger
+
+You will receive an event for each response that hit DONE call. Malformed client requests will not be passed into the handler. 
+Event is after processing all content handlers.
+
+The event will have the following parameters:
+
+ARG0 -> HTTP::Request object
+
+ARG1 -> HTTP::Response object
+
+That makes possible following code:
+
+	my ($login, $password) = $request->authorization_basic();
+	printf STDERR "%s - %s [%s] \"%s %s %s\" %d %d\n", 
+		$response->connection->remote_ip, $login||'-', POSIX::strftime("%d/%b/%Y:%T %z",localtime(time())),
+		$request->method(), $request->uri()->path(), $request->protocol(), 
+		$response->code(), length($response->content());
+	
+Emulate apache-like logs for PoCo::Server::SimpleHTTP
 
 =item C<SETUPHANDLER>
 
