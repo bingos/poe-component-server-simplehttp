@@ -12,7 +12,7 @@ use POE qw(Wheel::Run Filter::Reference Filter::Line);
 use POE::Kernel;
 use POE::Component::Server::SimpleHTTP;
 
-my $PORT = 2080;
+my $PORT = 2080 + int(rand() * 1000);
 my $IP = "localhost";
 
 POE::Component::Server::SimpleHTTP->new(
