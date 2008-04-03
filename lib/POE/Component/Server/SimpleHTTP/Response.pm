@@ -57,12 +57,13 @@ sub connection {
 sub stream {
    my $self = shift;
    my (%opt) = (@_);
-   
+
    no strict 'refs';
-   
+
    if ($opt{event} ne '') {
-      $self->{'STREAM_SESSION'}  = $opt{'session'} || undef;
-      $self->{'STREAM'}          = $opt{'event'};
+      $self->{'STREAM_SESSION'}     = $opt{'session'} || undef;
+      $self->{'STREAM'}             = $opt{'event'};
+      $self->{'DONT_FLUSH'}         = $opt{'dont_flush'};
    }
    else {
       $self->{'STREAM'} = shift;

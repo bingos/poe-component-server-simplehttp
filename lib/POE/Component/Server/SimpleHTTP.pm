@@ -71,7 +71,7 @@ sub new {
 
 			# Okay, pull in what is necessary
 			eval {
-				require POE::Component::SSLify; 
+				require POE::Component::SSLify;
 				import POE::Component::SSLify qw( SSLify_Options SSLify_GetSocket Server_SSLify SSLify_GetCipher );
 				SSLify_Options( @$SSLKEYCERT );
 			};
@@ -171,9 +171,9 @@ sub new {
 		# Make sure it is ref to an hash
 		if ( ref $opt{'ERRORHANDLER'} and ref( $opt{'ERRORHANDLER'} ) eq 'HASH' ) {
 			$ERRORHANDLER = delete $opt{'ERRORHANDLER'};
-			croak( 'ERRORHANDLER does not have a SESSION attribute' ) 
+			croak( 'ERRORHANDLER does not have a SESSION attribute' )
 			  unless $ERRORHANDLER->{'SESSION'};
-			croak( 'ERRORHANDLER does not have an EVENT attribute' ) 
+			croak( 'ERRORHANDLER does not have an EVENT attribute' )
 			  unless $ERRORHANDLER->{'EVENT'};
 		} else {
 			croak( 'ERRORHANDLER must be a reference to an HASH!' );
@@ -183,9 +183,9 @@ sub new {
 	if ( exists $opt{'LOGHANDLER'} and defined $opt{'LOGHANDLER'} ) {
 		if ( ref $opt{'LOGHANDLER'} and ref $opt{'LOGHANDLER'} eq 'HASH' ) {
 			$LOGHANDLER = delete $opt{'LOGHANDLER'};
-			croak( 'LOGHANDLER does not have a SESSION attribute' ) 
+			croak( 'LOGHANDLER does not have a SESSION attribute' )
 			  unless $LOGHANDLER->{'SESSION'};
-			croak( 'LOGHANDLER does not have an EVENT attribute' ) 
+			croak( 'LOGHANDLER does not have an EVENT attribute' )
 			  unless $LOGHANDLER->{'EVENT'};
 		}
 		else {
@@ -196,9 +196,9 @@ sub new {
 	if ( exists $opt{'LOG2HANDLER'} and defined $opt{'LOG2HANDLER'} ) {
 		if ( ref $opt{'LOG2HANDLER'} and ref $opt{'LOG2HANDLER'} eq 'HASH' ) {
 			$LOG2HANDLER = delete $opt{'LOG2HANDLER'};
-			croak( 'LOG2HANDLER does not have a SESSION attribute' ) 
+			croak( 'LOG2HANDLER does not have a SESSION attribute' )
 			  unless $LOG2HANDLER->{'SESSION'};
-			croak( 'LOG2HANDLER does not have an EVENT attribute' ) 
+			croak( 'LOG2HANDLER does not have an EVENT attribute' )
 			  unless $LOG2HANDLER->{'EVENT'};
 		}
 		else {
@@ -209,9 +209,9 @@ sub new {
 	if ( exists $opt{'SETUPHANDLER'} and defined $opt{'SETUPHANDLER'} ) {
 		if ( ref $opt{'SETUPHANDLER'} and ref $opt{'SETUPHANDLER'} eq 'HASH' ) {
 			$SETUPHANDLER = delete $opt{'SETUPHANDLER'};
-			croak( 'SETUPHANDLER does not have a SESSION attribute' ) 
+			croak( 'SETUPHANDLER does not have a SESSION attribute' )
 			  unless $SETUPHANDLER->{'SESSION'};
-			croak( 'SETUPHANDLER does not have an EVENT attribute' ) 
+			croak( 'SETUPHANDLER does not have an EVENT attribute' )
 			  unless $SETUPHANDLER->{'EVENT'};
 		}
 		else {
@@ -230,8 +230,8 @@ sub new {
 			croak( 'Unrecognized options were present in POE::Component::Server::SimpleHTTP->new -> ' . join( ', ', keys %opt ) );
 		}
 	}
-	
-	my $data = { 
+
+	my $data = {
 			'ALIAS'		   =>	$ALIAS,
 			'ADDRESS'	   =>	$ADDRESS,
 			'PORT'		   =>	$PORT,
@@ -258,7 +258,7 @@ sub new {
 			'_start'	=>	\&StartServer,
 			'_stop'		=>	\&FindRequestLeaks,
 			'_child'	=>	sub {},
-			
+
 		   # Register states
 		   'REGISTER' => \&Register,
 
@@ -281,7 +281,7 @@ sub new {
 
 			# Send output to connection!
 			'DONE'		=>	\&Request_Output,
-			
+
 			# Stream output to connection!
 			'STREAM'	   =>	\&Stream_Output,
 
@@ -384,7 +384,7 @@ sub StopServer {
         foreach my $conn ( keys %$S ) {
     		# Can't call method "shutdown_input" on an undefined value at
 	    	# /usr/lib/perl5/site_perl/5.8.2/POE/Component/Server/SimpleHTTP.pm line 323.
-		    if ( defined $S->{ $conn }->[0] and 
+		    if ( defined $S->{ $conn }->[0] and
                     defined $S->{ $conn }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
     			$S->{ $conn }->[0]->shutdown_input;
 	    		$S->{ $conn }->[0]->shutdown_output;
@@ -393,11 +393,11 @@ sub StopServer {
 		    delete $S->{ $conn };
 	    }
     }
-    
+
 
 	# Delete our alias
 	$_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} ) if $_[HEAP]->{'ALIAS'};
-	$_[KERNEL]->refcount_decrement( $_[HEAP]->{'SESSION_ID'}, __PACKAGE__ ) 
+	$_[KERNEL]->refcount_decrement( $_[HEAP]->{'SESSION_ID'}, __PACKAGE__ )
 		unless $_[HEAP]->{'ALIAS'};
 
 	# Debug stuff
@@ -547,7 +547,7 @@ sub MassageHandlers {
 		# Must be ref to hash
 		if ( ref $handler->[ $count ] and ref( $handler->[ $count ] ) eq 'HASH' ) {
 			# Make sure all the keys are uppercase
-			$handler->[ $count ]->{uc $_} = delete $handler->[ $count ]->{$_} 
+			$handler->[ $count ]->{uc $_} = delete $handler->[ $count ]->{$_}
 				for keys %{ $handler->[ $count ] };
 			# Make sure it got the 3 parts necessary
 			if ( ! exists $handler->[ $count ]->{'SESSION'} or ! defined $handler->[ $count ]->{'SESSION'} ) {
@@ -616,7 +616,7 @@ sub Got_Connection {
 
     if( DEBUG and keys %{ $_[HEAP]->{CONNECTIONS} } ) {
         # use Data::Dumper;
-        warn "conn id=", $wheel->ID, " [", 
+        warn "conn id=", $wheel->ID, " [",
             join( ', ', keys %{ $_[HEAP]->{CONNECTIONS} }), "]";
     }
 
@@ -671,11 +671,11 @@ sub Got_Input {
 	# Directly access POE::Wheel::ReadWrite's HANDLE_INPUT -> to get the socket itself
 	# Hmm, if we are SSL, then have to do an extra step!
 	elsif( defined $_[HEAP]->{'SSLKEYCERT'} ) {
-		$connection = 
+		$connection =
 			POE::Component::Server::SimpleHTTP::Connection->new( SSLify_GetSocket( $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) );
 	}
 	else {
-		$connection = 
+		$connection =
 			POE::Component::Server::SimpleHTTP::Connection->new( $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] );
 	}
 
@@ -691,7 +691,7 @@ sub Got_Input {
 		# Make the request nothing
 		$response = $request;
 		$request = undef;
-		
+
 		# Mark that this is a malformed request
 		$malformed_req = 1;
 
@@ -766,7 +766,7 @@ sub Got_Input {
 	   $request,
 	   $response->connection->remote_ip(),
 	) if $_[HEAP]->{'LOGHANDLER'};
-	
+
 	# Warn if we had a problem dispatching to the log handler above
 	warn("I had a problem posting to event '",
 	     $_[HEAP]->{'LOGHANDLER'}->{'EVENT'},
@@ -774,15 +774,15 @@ sub Got_Input {
 	     $_[HEAP]->{'LOGHANDLE'}->{'SESSION'},
           "'. As reported by Kernel: '$!', perhaps the alias is spelled incorrectly for this handler?")
         if $!;
-	
-	
+
+
 	# If we received a malformed request then
 	# let's not try to dispatch to a handler
 	if( $malformed_req ) {
 		# Just push out the response we got from POE::Filter::HTTPD saying your request was bad
-		POE::Kernel->post( 
-			$_[HEAP]->{ERRORHANDLER}->{SESSION}, 
-			$_[HEAP]->{ERRORHANDLER}->{EVENT}, 
+		POE::Kernel->post(
+			$_[HEAP]->{ERRORHANDLER}->{SESSION},
+			$_[HEAP]->{ERRORHANDLER}->{EVENT},
 			'BadRequest (by POE::Filter::HTTPD)', $response->connection->remote_ip()
 		);
 		$_[KERNEL]->yield('DONE', $response);
@@ -802,7 +802,7 @@ sub Got_Input {
 				croak("I had a problem posting to event $handler->{'EVENT'} of session $handler->{'SESSION'} for DIR handler '$handler->{'DIR'}'",
 			      	". As reported by Kernel: '$!', perhaps the session name is spelled incorrectly for this handler?")
                 	if $!;
-	
+
 				# All done!
 				return;
 			}
@@ -825,7 +825,7 @@ sub Got_Flush {
 	if ( DEBUG ) {
 		warn "Got Flush event for wheel ID ( $id )";
 	}
-	
+
    if ($_[HEAP]->{'REQUESTS'}->{ $id }->[1] == 2 ) {
 		# Do the stream !
 		if ( DEBUG ) {
@@ -840,7 +840,7 @@ sub Got_Flush {
             if ( DEBUG ) {
                 warn "Keep-alive id=$id ...";
             }
-            $_[HEAP]->{'CONNECTIONS'}->{ $id } = [ 
+            $_[HEAP]->{'CONNECTIONS'}->{ $id } = [
                       $_[HEAP]->{'REQUESTS'}->{ $id }->[0],   # wheel
                       $_[HEAP]->{'REQUESTS'}->{ $id }->[2]->connection
                     ];
@@ -926,7 +926,7 @@ sub Got_Error {
 	    	delete $_[HEAP]->{'REQUESTS'}->{ $id }->[0];
 	    	delete $_[HEAP]->{'REQUESTS'}->{ $id };
         }
-            
+
 		# Mark the client dead
 		$connection->{'DIED'} = 1;
 	}
@@ -959,7 +959,7 @@ sub Request_Output {
 		if ( DEBUG ) {
 			warn 'Wheel disappeared, but the application sent us a DONE event, discarding it';
 		}
-		
+
       POE::Kernel->post(
          $_[HEAP]->{ERRORHANDLER}->{SESSION},
          $_[HEAP]->{ERRORHANDLER}->{EVENT},
@@ -985,7 +985,7 @@ sub Request_Output {
          $_[HEAP]->{ERRORHANDLER}->{SESSION},
          $_[HEAP]->{ERRORHANDLER}->{EVENT},
          'Socket closed/nonexistant !'
-      ); 
+      );
 		return;
 	}
 
@@ -998,19 +998,19 @@ sub Request_Output {
    $_[HEAP]->{'REQUESTS'}->{ $id }->[1] = 1;
 
 	# Log FINALLY If they have a logFinal handler registered, send out the needed information
-	$_[KERNEL]->call( 
-		$_[HEAP]->{'LOG2HANDLER'}->{'SESSION'}, 
-		$_[HEAP]->{'LOG2HANDLER'}->{'EVENT'}, 
+	$_[KERNEL]->call(
+		$_[HEAP]->{'LOG2HANDLER'}->{'SESSION'},
+		$_[HEAP]->{'LOG2HANDLER'}->{'EVENT'},
 		$_[HEAP]->{'REQUESTS'}{ $id }[3],
-		$response) 
+		$response)
 	if $_[HEAP]->{'LOG2HANDLER'};
-	
+
 	# Warn if we had a problem dispatching to the log handler above
-	warn("I had a problem posting to event '", 
-		$_[HEAP]->{'LOG2HANDLER'}->{'EVENT'}, 
-		"' of the log handler alias '", 
-		$_[HEAP]->{'LOG2HANDLER'}->{'SESSION'}, 
-		"'. As reported by Kernel: '$!', perhaps the alias is spelled incorrectly for this handler?") 
+	warn("I had a problem posting to event '",
+		$_[HEAP]->{'LOG2HANDLER'}->{'EVENT'},
+		"' of the log handler alias '",
+		$_[HEAP]->{'LOG2HANDLER'}->{'SESSION'},
+		"'. As reported by Kernel: '$!', perhaps the alias is spelled incorrectly for this handler?")
 	if $!;
 
 
@@ -1018,7 +1018,7 @@ sub Request_Output {
    if ( DEBUG ) {
            warn "Completed with Wheel ID $id";
    }
-  
+
    # Success!
    return 1;
 }
@@ -1026,24 +1026,24 @@ sub Request_Output {
 # Stream output to the client
 sub Stream_Output {
    # ARG0 = HTTP::Response object
-   my ($kernel, $response) = @_[KERNEL, ARG0 ];   
-   
+   my ($kernel, $response) = @_[KERNEL, ARG0 ];
+
    # Check if we got it
    if ( ! defined $response or ! UNIVERSAL::isa( $response, 'HTTP::Response' ) ) {
       if ( DEBUG ) {
          warn 'Did not get a HTTP::Response object!';
       }
-      
+
       # Abort...
       return undef;
    }
-   
+
    # Get the wheel ID
    my $id = $response->_WHEEL;
    $_[HEAP]->{'CHUNKCOUNT'}->{ $id }++;
 
    if (defined $response->{'STREAM'}) {
-      # Keep track if we plan to stream ...   	
+      # Keep track if we plan to stream ...
       if ( $_[HEAP]->{'RESPONSES'}->{ $id } ) {
          if ( DEBUG ) {
             warn "Restoring response from HEAP and id $id ";
@@ -1075,14 +1075,14 @@ sub Stream_Output {
          $_[HEAP]->{ERRORHANDLER}->{SESSION},
          $_[HEAP]->{ERRORHANDLER}->{EVENT},
          'Wheel disappeared !'
-      ); 
+      );
       # All done!
       return 1;
    }
-   
+
    # Quick check to see if the wheel/socket died already...
    # Initially reported by Tim Wood
-   if ( ! defined $_[HEAP]->{'REQUESTS'}->{ $id }->[0] 
+   if ( ! defined $_[HEAP]->{'REQUESTS'}->{ $id }->[0]
       or ! defined $_[HEAP]->{'REQUESTS'}->{ $id }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
       if ( DEBUG ) {
          warn 'Tried to send data over a closed/nonexistant socket!';
@@ -1091,14 +1091,14 @@ sub Stream_Output {
          $_[HEAP]->{ERRORHANDLER}->{SESSION},
          $_[HEAP]->{ERRORHANDLER}->{EVENT},
          'Socket closed/nonexistant !'
-      ); 
+      );
       return;
    }
-   
+
    Fix_Headers( $_[HEAP], $response, 1 );
 
    # Preliminary check
-   if ( ! defined $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0] 
+   if ( ! defined $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]
       or ! defined $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
       if ( DEBUG ) {
          warn 'Tried to send data over a closed/nonexistant socket!';
@@ -1110,14 +1110,14 @@ sub Stream_Output {
    unless (defined $response->{'IS_STREAMING'}) {
       # Mark this socket done
       $_[HEAP]->{'REQUESTS'}->{ $id }->[1] = 2;
-      
+
       #
       $response->{'IS_STREAMING'} = 1;
    }
-   
+
    if ( DEBUG ) {
       warn "Sending stream via ".$response->{STREAM_SESSION}."/".$response->{STREAM}." with id $id \n" ;
-   }      
+   }
 
    if ( $_[HEAP]->{'CHUNKCOUNT'}->{ $id } > 1  ) {
       $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]->set_output_filter(POE::Filter::Stream->new() ) ;
@@ -1129,17 +1129,17 @@ sub Stream_Output {
    }
 
    $response->content();
-   
-   # we send the event to stream with wheels request and response to the session 
-   # that has registered the streaming event     
-   unless ($response->{'dont_flush'}) {          
+
+   # we send the event to stream with wheels request and response to the session
+   # that has registered the streaming event
+   unless ($response->{'DONT_FLUSH'}) {
       POE::Kernel->post(
          $response->{STREAM_SESSION},           # callback session
          $response->{STREAM},                   # callback event
          $_[HEAP]->{'RESPONSES'}->{$response->_WHEEL}
-      ); 
+      );
    }
-	
+
     # Success!
 	return 1;
 }
@@ -1152,7 +1152,7 @@ sub Fix_Headers
     if ( ! $response->header( 'Date' ) ) {
         $response->header( 'Date', time2str( time ) );
     }
-   
+
 	# Set the Content-Length if needed
 	if ( not $stream and not defined $response->header( 'Content-Length' )  ) {
 		use bytes;
@@ -1195,7 +1195,7 @@ sub Request_Close {
     if( $_[HEAP]->{'CONNECTIONS'}->{ $id } ) {
         my $c = delete $_[HEAP]->{'CONNECTIONS'}->{ $id };
         $_[HEAP]->{'REQUESTS'}->{ $id } = [ $c->[0], 0, undef ];
-    }        
+    }
 
 
 	# Check if the wheel exists ( sometimes it gets closed by the client, but the application doesn't know that... )
@@ -1232,11 +1232,11 @@ sub Request_Close {
 # Registers a POE inline state (primarly for streaming)
 sub Register {
    my ( $session , $state, $code_ref) = @_[SESSION, ARG0 .. ARG1];
-   
+
 	if ( DEBUG ) {
 		warn 'Registering state in POE session';
 	}
-   
+
    return $session->register_state( $state, $code_ref );
 }
 
@@ -1247,7 +1247,7 @@ sub SetCloseHandler
     my( $connection, $state, @params ) = @_[ ARG0..$#_ ];
 
     # turn connection ID into the connection object
-    unless( ref $connection ) {         
+    unless( ref $connection ) {
         my $id = $connection;
         if( $heap->{'CONNECTIONS'}->{$id} ) {
             $connection = $heap->{'CONNECTIONS'}->{$id}->[1];
@@ -1316,7 +1316,7 @@ POE::Component::Server::SimpleHTTP - Perl extension to serve HTTP requests in PO
 		'LOGHANDLER' => { 'SESSION' => 'HTTP_GET',
 				  'EVENT'   => 'GOT_LOG',
 		},
-		
+
 		'LOG2HANDLER' => { 'SESSION' => 'HTTP_GET',
 				  'EVENT'   => 'POSTLOG',
 		},
@@ -1396,7 +1396,7 @@ POE::Component::Server::SimpleHTTP - Perl extension to serve HTTP requests in PO
 	}
 
 	sub GOT_LOG {
-		# ARG0 = HTTP::Request object, ARG1 = remote IP 
+		# ARG0 = HTTP::Request object, ARG1 = remote IP
 		my ($request, $remote_ip) = @_[ARG0,ARG1];
 
 		# Do some sort of logging activity.
@@ -1541,7 +1541,7 @@ EVENT	->	The event to trigger
 
 You will receive an event for each request to the server from clients.  Malformed client requests will not be passed into the handler.  Instead
 undef will be passed.
-Event is called before ANY content handler is called. 
+Event is called before ANY content handler is called.
 
 The event will have the following parameters:
 
@@ -1557,7 +1557,7 @@ SESSION	->	The session to send the input
 
 EVENT	->	The event to trigger
 
-You will receive an event for each response that hit DONE call. Malformed client requests will not be passed into the handler. 
+You will receive an event for each response that hit DONE call. Malformed client requests will not be passed into the handler.
 Event is after processing all content handlers.
 
 The event will have the following parameters:
@@ -1569,11 +1569,11 @@ ARG1 -> HTTP::Response object
 That makes possible following code:
 
 	my ($login, $password) = $request->authorization_basic();
-	printf STDERR "%s - %s [%s] \"%s %s %s\" %d %d\n", 
+	printf STDERR "%s - %s [%s] \"%s %s %s\" %d %d\n",
 		$response->connection->remote_ip, $login||'-', POSIX::strftime("%d/%b/%Y:%T %z",localtime(time())),
-		$request->method(), $request->uri()->path(), $request->protocol(), 
+		$request->method(), $request->uri()->path(), $request->protocol(),
 		$response->code(), length($response->content());
-	
+
 Emulate apache-like logs for PoCo::Server::SimpleHTTP
 
 =item C<SETUPHANDLER>
@@ -1639,11 +1639,11 @@ SimpleHTTP is so simple, there are only 8 events available.
 
 =item C<SETCLOSEHANDLER>
 
-    $_[KERNEL]->call( $_[SENDER], 'SETCLOSEHANDLER', $connection, 
+    $_[KERNEL]->call( $_[SENDER], 'SETCLOSEHANDLER', $connection,
                       $event, @args );
 
 Calls C<$event> in the current session when C<$connection> is closed.  You
-could use for persistent connection handling.  
+could use for persistent connection handling.
 
 Multiple session may register close handlers.
 
@@ -1679,15 +1679,15 @@ associated with this C<$connection>.
 
 	With a $response argument it streams the content and calls back the streaming event
 	of the user's session (or with the dont_flush option you're responsible for calling
-        back your session's streaming event).	
-	
+        back your session's streaming event).
+
 	To use the streaming feature see below.
 
 =back
 
 =head2 Streaming with SimpleHTTP
 
-It's possible to send data as a stream to clients (unbuffered and integrated in the 
+It's possible to send data as a stream to clients (unbuffered and integrated in the
 POE loop).
 
 Just create your session to receive events from SimpleHTTP as usually and add a
@@ -1701,7 +1701,7 @@ $response to a streaming state and once you trigger it:
       event       => 'GOT_STREAM',
       dont_flush  => 1
    );
-   
+
    # then you can simply yield your streaming event, once the GOT_STREAM event
    # has reached its end it will be triggered again and again, until you
    # send a CLOSE event to the kernel with the appropriate response as parameter
@@ -1716,10 +1716,10 @@ shutdown when your streaming is done (EOF for example).
 
    sub GOT_STREAM {
       my ( $kernel, $heap, $response ) = @_[KERNEL, HEAP, ARG0];
-      
+
       # sets the content of the response
       $response->content("Hello World\n");
-      
+
       # send it to the client
       POE::Kernel->post('HTTPD', 'STREAM', $response);
 
@@ -1739,7 +1739,7 @@ shutdown when your streaming is done (EOF for example).
    }
 
 The dont_flush option is there to be able to control the frequency of flushes
-to the client. 
+to the client.
 
 =head2 SimpleHTTP Notes
 
