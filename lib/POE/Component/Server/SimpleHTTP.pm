@@ -9,7 +9,7 @@ use vars qw($VERSION);
 
 # Initialize our version
 # $Revision: 1181 $
-$VERSION = '1.42';
+$VERSION = '1.44';
 
 # Import what we need from the POE namespace
 use POE;
@@ -57,7 +57,7 @@ sub new {
 	$opt{uc $_} = delete $opt{$_} for keys %opt; # Fix that pesky uppercase option stuff.
 
 	# Our own options
-	my ( $ALIAS, $ADDRESS, $PORT, $HOSTNAME, $HEADERS, $HANDLERS, $SSLKEYCERT, $LOGHANDLER, $ERRORHANDLER, $SETUPHANDLER, $LOG2HANDLER );
+	my ( $ALIAS, $ADDRESS, $PORT, $HOSTNAME, $HEADERS, $HANDLERS, $SSLKEYCERT, $LOGHANDLER, $ERRORHANDLER, $SETUPHANDLER, $LOG2HANDLER, $PROXYMODE );
 
 	# You could say I should do this: $Stuff = delete $opt{'Stuff'}
 	# But, that kind of behavior is not defined, so I would not trust it...
@@ -218,6 +218,8 @@ sub new {
 			croak( 'SETUPHANDLER must be a reference to an HASH!' );
 		}
 	}
+	
+	$PROXYMODE = $opt{'PROXYMODE'};
 
     my $KEEPALIVE = 0;
     if ( exists $opt{'KEEPALIVE'} ) {
@@ -245,6 +247,7 @@ sub new {
 			'LOG2HANDLER'   =>	$LOG2HANDLER,
 			'SETUPHANDLER' =>	$SETUPHANDLER,
 			'ERRORHANDLER' =>	$ERRORHANDLER,
+			'PROXYMODE' => 		$PROXYMODE,
             'KEEPALIVE'    =>   $KEEPALIVE
 	};
 
@@ -704,17 +707,19 @@ sub Got_Input {
 		# Set the path to an empty string
 		$path = '';
 	} else {
-		# Add stuff it needs!
-		my $uri = $request->uri;
-		$uri->scheme( 'http' );
-		$uri->host( $_[HEAP]->{'HOSTNAME'} );
-		$uri->port( $_[HEAP]->{'PORT'} );
+		unless ( $_[HEAP]->{'PROXYMODE'} ) {
+			# Add stuff it needs!
+			my $uri = $request->uri;
+			$uri->scheme( 'http' );
+			$uri->host( $_[HEAP]->{'HOSTNAME'} );
+			$uri->port( $_[HEAP]->{'PORT'} );
 
-		# Get the path
-		$path = $uri->path();
-		if ( ! defined $path or $path eq '' ) {
-			# Make it the default handler
-			$path = '/';
+			# Get the path
+			$path = $uri->path();
+			if ( ! defined $path or $path eq '' ) {
+				# Make it the default handler
+				$path = '/';
+			}
 		}
 
 		# Get the response
@@ -1594,6 +1599,11 @@ This should be an arrayref of only 2 elements - the public key and certificate l
 is greatly welcome!
 
 Again, this will automatically turn every incoming connection into a SSL socket. Once enough testing has been done, this option will be augmented with more SSL stuff!
+
+=item C<PROXYMODE>
+
+Set this to a true value to enable the server to act as a proxy server, ie. it won't mangle the HTTP::Request
+URI.
 
 =back
 
