@@ -9,7 +9,7 @@ use vars qw($VERSION);
 
 # Initialize our version
 # $Revision: 1181 $
-$VERSION = '1.44';
+$VERSION = '1.46';
 
 # Import what we need from the POE namespace
 use POE;
@@ -720,6 +720,10 @@ sub Got_Input {
 				# Make it the default handler
 				$path = '/';
 			}
+		}
+		else {
+			# We're in PROXYMODE set the path to the full URI
+			$path = $request->uri->as_string();
 		}
 
 		# Get the response

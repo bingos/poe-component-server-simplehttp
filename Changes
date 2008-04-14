@@ -1,4 +1,37 @@
 ========================
+2008-04-14 11:30:47 1.44
+========================
+
+  2008-04-14 11:27:08 (r115) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; Makefile.PL M; Changes M
+
+    Added PROXYMODE setting
+
+  2008-04-03 15:18:15 (r114) by eriam
+  lib/POE/Component/Server/SimpleHTTP/Response.pm M;
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Dont flush option added in the Response object and corrected case.
+
+  2008-02-22 01:12:35 (r113) by agaran; todo A
+
+    - BinGOs, dont kill me, but i like to have todo to consider 
+
+  2008-02-22 00:42:03 (r112) by agaran; t/11_keepalive.t M
+
+    - random port used for testing, helped for me in few cases 
+
+  2008-02-20 20:49:27 (r111) by agaran
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    - missed one letter 
+
+  2008-02-20 17:16:43 (r110) by agaran
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    - new LOG2HANDLER which is fired after servicing request 
+
+========================
 2008-02-13 08:42:59 1.42
 ========================
 
