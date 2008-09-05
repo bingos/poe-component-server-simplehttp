@@ -3,7 +3,7 @@ package POE::Component::Server::SimpleHTTP::Connection;
 
 # Standard stuff to catch errors
 use strict qw(subs vars refs);				# Make sure we can't mess up
-use warnings FATAL => 'all';				# Enable warnings to catch errors
+use warnings;				# Enable warnings to catch errors
 
 # Initialize our version
 # $Revision: 1181 $

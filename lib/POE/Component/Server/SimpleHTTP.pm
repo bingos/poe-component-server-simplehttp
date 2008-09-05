@@ -3,13 +3,13 @@ package POE::Component::Server::SimpleHTTP;
 
 # Standard stuff to catch errors
 use strict qw(subs vars refs);				# Make sure we can't mess up
-use warnings FATAL => 'all';				# Enable warnings to catch errors
+use warnings;
 
 use vars qw($VERSION);
 
 # Initialize our version
 # $Revision: 1181 $
-$VERSION = '1.46';
+$VERSION = '1.48';
 
 # Import what we need from the POE namespace
 use POE;
