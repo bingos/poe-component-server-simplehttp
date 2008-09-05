@@ -769,20 +769,22 @@ sub Got_Input {
 	# TODO if we received a malformed request, we will not have a request object
 	# We need to figure out what we're doing because they can't always expect to have
 	# a request object, or should we keep it from being ?undef'd?
-	$_[KERNEL]->post(
-	   $_[HEAP]->{'LOGHANDLER'}->{'SESSION'},
-	   $_[HEAP]->{'LOGHANDLER'}->{'EVENT'},
-	   $request,
-	   $response->connection->remote_ip(),
-	) if $_[HEAP]->{'LOGHANDLER'};
+	if($_[HEAP]->{'LOGHANDLER'}) {
+		$! = undef;
+		$_[KERNEL]->post(
+		   $_[HEAP]->{'LOGHANDLER'}->{'SESSION'},
+		   $_[HEAP]->{'LOGHANDLER'}->{'EVENT'},
+		   $request,
+		   $response->connection->remote_ip());
 
-	# Warn if we had a problem dispatching to the log handler above
-	warn("I had a problem posting to event '",
-	     $_[HEAP]->{'LOGHANDLER'}->{'EVENT'},
-	     "' of the log handler alias '",
-	     $_[HEAP]->{'LOGHANDLE'}->{'SESSION'},
-          "'. As reported by Kernel: '$!', perhaps the alias is spelled incorrectly for this handler?")
-        if $!;
+		# Warn if we had a problem dispatching to the log handler above
+		warn("I had a problem posting to event '",
+		     $_[HEAP]->{'LOGHANDLER'}->{'EVENT'},
+		     "' of the log handler alias '",
+		     $_[HEAP]->{'LOGHANDLE'}->{'SESSION'},
+		  "'. As reported by Kernel: '$!', perhaps the alias is spelled incorrectly for this handler?")
+		if $!;
+	}
 
 
 	# If we received a malformed request then
@@ -1007,20 +1009,22 @@ sub Request_Output {
    $_[HEAP]->{'REQUESTS'}->{ $id }->[1] = 1;
 
 	# Log FINALLY If they have a logFinal handler registered, send out the needed information
-	$_[KERNEL]->call(
-		$_[HEAP]->{'LOG2HANDLER'}->{'SESSION'},
-		$_[HEAP]->{'LOG2HANDLER'}->{'EVENT'},
-		$_[HEAP]->{'REQUESTS'}{ $id }[3],
-		$response)
-	if $_[HEAP]->{'LOG2HANDLER'};
+	if($_[HEAP]->{'LOG2HANDLER'}) {
+		$! = undef;
+		$_[KERNEL]->call(
+			$_[HEAP]->{'LOG2HANDLER'}->{'SESSION'},
+			$_[HEAP]->{'LOG2HANDLER'}->{'EVENT'},
+			$_[HEAP]->{'REQUESTS'}{ $id }[3],
+			$response);
 
-	# Warn if we had a problem dispatching to the log handler above
-	warn("I had a problem posting to event '",
-		$_[HEAP]->{'LOG2HANDLER'}->{'EVENT'},
-		"' of the log handler alias '",
-		$_[HEAP]->{'LOG2HANDLER'}->{'SESSION'},
-		"'. As reported by Kernel: '$!', perhaps the alias is spelled incorrectly for this handler?")
-	if $!;
+		# Warn if we had a problem dispatching to the log handler above
+		warn("I had a problem posting to event '",
+			$_[HEAP]->{'LOG2HANDLER'}->{'EVENT'},
+			"' of the log handler alias '",
+			$_[HEAP]->{'LOG2HANDLER'}->{'SESSION'},
+			"'. As reported by Kernel: '$!', perhaps the alias is spelled incorrectly for this handler?")
+		if $!;
+	}
 
 
    # Debug stuff
