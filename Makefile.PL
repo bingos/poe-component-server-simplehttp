@@ -4,6 +4,7 @@ use inc::Module::Install;
 name 'POE-Component-Server-SimpleHTTP';
 author 'Apocalypse <APOCAL@cpan.org>';
 license 'perl';
+perl_version '5.006';
 version_from 'lib/POE/Component/Server/SimpleHTTP.pm';
 abstract_from 'lib/POE/Component/Server/SimpleHTTP.pm';
 

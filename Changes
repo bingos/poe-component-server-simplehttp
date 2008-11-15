@@ -1,4 +1,27 @@
 ========================
+2008-09-05 15:39:31 1.48
+========================
+
+  2008-09-05 15:36:56 (r121) by bingos; Makefile.PL M
+
+    Added makemaker_args() directive to Makefile.PL, thanks to Matt Trout
+    for that tip
+
+  2008-09-05 15:34:46 (r120) by bingos
+  lib/POE/Component/Server/SimpleHTTP/PreFork.pm M;
+  lib/POE/Component/Server/SimpleHTTP/Response.pm M;
+  lib/POE/Component/Server/SimpleHTTP/Connection.pm M;
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Removed the FATAL => 'all' from use warnings. suggested by Andreas
+    Gudmundsson
+
+  2008-09-05 15:24:08 (r119) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; Changes M
+
+    Downstream Debian patch applied RT #38743 by Martin Ferrari
+
+========================
 2008-04-14 12:09:28 1.46
 ========================
 

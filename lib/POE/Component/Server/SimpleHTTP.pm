@@ -83,12 +83,14 @@ sub new {
 				# Force ourself to not use SSL
 				$SSLKEYCERT = undef;
 			}
-		} else {
+		} 
+		else {
 			if ( DEBUG ) {
 				warn 'The SSLKEYCERT option must be an array with exactly 2 elements in it!';
 			}
 		}
-	} else {
+	} 
+	else {
 		$SSLKEYCERT = undef;
 	}
 
@@ -102,7 +104,8 @@ sub new {
 	if ( exists $opt{'PORT'} and defined $opt{'PORT'} and length( $opt{'PORT'} ) ) {
 		$PORT = $opt{'PORT'};
 		delete $opt{'PORT'};
-	} else {
+	} 
+	else {
 		croak( 'PORT is required to create a new POE::Component::Server::SimpleHTTP instance!' );
 	}
 
@@ -119,7 +122,8 @@ sub new {
 	if ( exists $opt{'HOSTNAME'} and defined $opt{'HOSTNAME'} and length( $opt{'HOSTNAME'} ) ) {
 		$HOSTNAME = $opt{'HOSTNAME'};
 		delete $opt{'HOSTNAME'};
-	} else {
+	} 
+	else {
 		if ( DEBUG ) {
 			warn 'Using Sys::Hostname for HOSTNAME';
 		}
@@ -140,10 +144,12 @@ sub new {
 		if ( ref $opt{'HEADERS'} and ref( $opt{'HEADERS'} ) eq 'HASH' ) {
 			$HEADERS = $opt{'HEADERS'};
 			delete $opt{'HEADERS'};
-		} else {
+		} 
+		else {
 			croak( 'HEADERS must be a reference to a HASH!' );
 		}
-	} else {
+	} 
+	else {
 		# Set to none
 		$HEADERS = {};
 
@@ -159,10 +165,12 @@ sub new {
 		if ( ref $opt{'HANDLERS'} and ref( $opt{'HANDLERS'} ) eq 'ARRAY' ) {
 			$HANDLERS = $opt{'HANDLERS'};
 			delete $opt{'HANDLERS'};
-		} else {
+		} 
+		else {
 			croak( 'HANDLERS must be a reference to an ARRAY!' );
 		}
-	} else {
+	} 
+	else {
 		croak( 'HANDLERS is required to create a new POE::Component::Server::SimpleHTTP instance!' );
 	}
 
@@ -175,7 +183,8 @@ sub new {
 			  unless $ERRORHANDLER->{'SESSION'};
 			croak( 'ERRORHANDLER does not have an EVENT attribute' )
 			  unless $ERRORHANDLER->{'EVENT'};
-		} else {
+		} 
+		else {
 			croak( 'ERRORHANDLER must be a reference to an HASH!' );
 		}
 	}
@@ -422,7 +431,8 @@ sub SetupListener {
 	# Check if we should set up the wheel
 	if ( $_[HEAP]->{'RETRIES'} == MAX_RETRIES ) {
 		die 'POE::Component::Server::SimpleHTTP tried ' . MAX_RETRIES . ' times to create a Wheel and is giving up...';
-	} else {
+	} 
+	else {
 		# Increment the retry count if we did not get 'NOINC' as an argument
 		if ( ! defined $_[ARG0] ) {
 			# Increment the retries count
@@ -575,11 +585,13 @@ sub MassageHandlers {
 			# Check for errors
 			if ( $@ ) {
 				croak( "HANDLER number $count has a malformed DIR -> $@" );
-			} else {
+			} 
+			else {
 				# Store it!
 				$handler->[ $count ]->{'RE'} = $regex;
 			}
-		} else {
+		} 
+		else {
 			croak( "HANDLER number $count is not a reference to a HASH!" );
 		}
 
@@ -706,7 +718,8 @@ sub Got_Input {
 
 		# Set the path to an empty string
 		$path = '';
-	} else {
+	} 
+	else {
 		unless ( $_[HEAP]->{'PROXYMODE'} ) {
 			# Add stuff it needs!
 			my $uri = $request->uri;
@@ -750,7 +763,8 @@ sub Got_Input {
 
 		# All done!
 		return;
-	} else {
+	} 
+	else {
 		# If we used SSL, turn on the flag!
 		if ( defined $_[HEAP]->{'SSLKEYCERT'} ) {
 			$response->{'CONNECTION'}->{'SSLified'} = 1;
@@ -797,7 +811,8 @@ sub Got_Input {
 			'BadRequest (by POE::Filter::HTTPD)', $response->connection->remote_ip()
 		);
 		$_[KERNEL]->yield('DONE', $response);
-	} else {
+	} 
+	else {
 	   # Find which handler will handle this one
 		foreach my $handler ( @{ $_[HEAP]->{'HANDLERS'} } ) {
 			# Check if this matches
@@ -916,14 +931,14 @@ sub Must_KeepAlive
 # Got some sort of error from ReadWrite
 sub Got_Error {
 	# ARG0 = operation, ARG1 = error number, ARG2 = error string, ARG3 = wheel ID
-	my ( $operation, $errnum, $errstr, $id ) = @_[ ARG0 .. ARG3 ];
+   my ( $operation, $errnum, $errstr, $id ) = @_[ ARG0 .. ARG3 ];
 
 	# Only do this for non-EOF on read
-	unless ( $operation eq 'read' and $errnum == 0 ) {
+   unless ( $operation eq 'read' and $errnum == 0 ) {
 		# Debug stuff
-		if ( DEBUG ) {
-			warn "Wheel $id generated $operation error $errnum: $errstr\n";
-		}
+	if ( DEBUG ) {
+  	   warn "Wheel $id generated $operation error $errnum: $errstr\n";
+	}
 
         my $connection;
         if( $_[HEAP]->{'CONNECTIONS'}{ $id } ) {
@@ -940,10 +955,10 @@ sub Got_Error {
 
 		# Mark the client dead
 		$connection->{'DIED'} = 1;
-	}
+   }
 
 	# Success!
-	return 1;
+   return 1;
 }
 
 # Output to the client!
@@ -971,11 +986,11 @@ sub Request_Output {
 			warn 'Wheel disappeared, but the application sent us a DONE event, discarding it';
 		}
 
-      POE::Kernel->post(
-         $_[HEAP]->{ERRORHANDLER}->{SESSION},
-         $_[HEAP]->{ERRORHANDLER}->{EVENT},
-         'Wheel disappeared !'
-      );
+      		POE::Kernel->post(
+         		$_[HEAP]->{ERRORHANDLER}->{SESSION},
+         		$_[HEAP]->{ERRORHANDLER}->{EVENT},
+         		'Wheel disappeared !'
+      		);
 		# All done!
 		return 1;
 	}
@@ -992,11 +1007,11 @@ sub Request_Output {
 		if ( DEBUG ) {
 			warn 'Tried to send data over a closed/nonexistant socket!';
 		}
-      POE::Kernel->post(
-         $_[HEAP]->{ERRORHANDLER}->{SESSION},
-         $_[HEAP]->{ERRORHANDLER}->{EVENT},
-         'Socket closed/nonexistant !'
-      );
+      		POE::Kernel->post(
+         		$_[HEAP]->{ERRORHANDLER}->{SESSION},
+         		$_[HEAP]->{ERRORHANDLER}->{EVENT},
+         		'Socket closed/nonexistant !'
+      		);
 		return;
 	}
 
