@@ -9,7 +9,7 @@ use vars qw($VERSION);
 
 # Initialize our version
 # $Revision: 1181 $
-$VERSION = '1.48';
+$VERSION = '1.50';
 
 # Import what we need from the POE namespace
 use POE;
@@ -1182,9 +1182,9 @@ sub Fix_Headers
     }
 
 	# Set the Content-Length if needed
-	if ( not $stream and not defined $response->header( 'Content-Length' )  ) {
+	if ( !$stream and ! defined $response->header( 'Content-Length' ) and my $len = length $response->content ) {
 		use bytes;
-		$response->header( 'Content-Length', length( $response->content ) );
+		$response->header( 'Content-Length', $len );
 	}
 
 	# Set the Content-Type if needed
