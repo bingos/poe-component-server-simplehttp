@@ -166,6 +166,7 @@ sub _tests
 {                      
     sleep 4;
     binmode(STDOUT) if $^O eq 'MSWin32';
+    STDOUT->autoflush(1);
     my $filter = POE::Filter::Reference->new();
 
     my $results = [ ];
