@@ -1,0 +1,50 @@
+#use ExtUtils::MakeMaker;
+use inc::Module::Install;
+
+name 'POE-Component-Server-SimpleHTTP';
+author 'Apocalypse <APOCAL@cpan.org>';
+license 'perl';
+perl_version '5.006';
+version_from 'lib/POE/Component/Server/SimpleHTTP.pm';
+abstract_from 'lib/POE/Component/Server/SimpleHTTP.pm';
+
+# Build the prerequisite list
+requires    'HTTP::Date'       =>    0;
+requires    'Carp'             =>    0;
+requires    'Sys::Hostname'    =>    0;
+requires    'POE'              =>    '1.0000';
+requires    'Storable'         =>    0;
+requires    'Socket'           =>    0;
+requires    'HTTP::Request'    =>    0;
+requires    'HTTP::Response'   =>    0;
+
+build_requires   'Test::More'                   => 0.47;
+build_requires   'LWP::UserAgent'               =>    0;
+build_requires   'LWP::ConnCache'               =>    0;
+
+my $value = prompt( 'Do you want to test streaming ( requires POE::Component::Client::HTTP ) [y/N]?', 'N' );
+build_requires   'POE::Component::Client::HTTP' => 0.82 if $value =~ /^Y$/i;
+
+# Ask users if they want SSL support
+$value = prompt( 'Do you want SSL support ( requires POE::Component::SSLify ) [y/N]?', 'N' );
+
+# Add to the prereqs PoCo::SSLify?
+requires 'POE::Component::SSLify' => '0.04' if $value =~ /^Y$/i;
+
+# Ask users if they want PreFork support
+$value = prompt( 'Do you want PreFork support ( requires IPC::Shareable ) [y/N]?', 'N' );
+
+# Add to the prereqs IPC::Shareable?
+if ( $value =~ /^Y$/i ) {
+   requires 'IPC::Shareable' => '0';
+   build_requires   'POE::Component::Client::HTTP' => 0.82;
+}
+
+# Sanity check
+eval { require IPC::Shareable; };
+build_requires 'POE::Component::Client::HTTP' => 0.82 unless $@;
+
+# Thanks to Matt Trout for this tip
+makemaker_args(dist => { PREOP => "$^X ./tools/svn-log.perl > ./Changes" });
+
+WriteAll();
