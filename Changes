@@ -1,4 +1,18 @@
 ========================
+2008-12-17 10:42:57 1.50
+========================
+
+  2008-12-17 10:39:28 (r124) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Fix applied for RT #41780
+
+  2008-11-15 08:53:26 (r123) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; Makefile.PL M; Changes M
+
+    Some code tidying
+
+========================
 2008-09-05 15:39:31 1.48
 ========================
 

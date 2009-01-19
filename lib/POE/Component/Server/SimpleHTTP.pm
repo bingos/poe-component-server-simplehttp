@@ -9,7 +9,7 @@ use vars qw($VERSION);
 
 # Initialize our version
 # $Revision: 1181 $
-$VERSION = '1.50';
+$VERSION = '1.52';
 
 # Import what we need from the POE namespace
 use POE;
@@ -379,7 +379,9 @@ sub StopServer {
 			# Alright, shutdown anyway
 
 			# Delete our alias
-			$_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} );
+			$_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} ) if $_[HEAP]->{'ALIAS'};
+			$_[KERNEL]->refcount_decrement( $_[HEAP]->{'SESSION_ID'}, __PACKAGE__ )
+				unless $_[HEAP]->{'ALIAS'};
 
 			# Debug stuff
 			if ( DEBUG ) {
