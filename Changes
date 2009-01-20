@@ -1,3 +1,18 @@
+==============================
+9999-99-99 99:99:99 (untagged)
+==============================
+
+  2009-01-19 21:23:03 (r128) by bingos
+  t/05_run.t M; t/07_bad_request.t M; t/11_keepalive.t M
+
+    Hopefully fixed mysteriously failing tests, by making the STDOUT
+    "hot" in the forked process
+
+  2009-01-19 21:07:42 (r126) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; Changes M
+
+    Fix [rt.cpan.org #42444] reported by pravus
+
 ========================
 2008-12-17 10:42:57 1.50
 ========================

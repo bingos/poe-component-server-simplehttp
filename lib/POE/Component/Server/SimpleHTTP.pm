@@ -21,6 +21,7 @@ use POE::Filter::Stream;
 
 # Other miscellaneous modules we need
 use Carp qw( croak );
+use Socket;
 
 # HTTP-related modules
 use HTTP::Date qw( time2str );
@@ -339,22 +340,23 @@ sub FindRequestLeaks {
 
 # Starts the server!
 sub StartServer {
+	my $heap = $_[HEAP];
 	# Debug stuff
 	if ( DEBUG ) {
 		warn 'Starting up SimpleHTTP now';
 	}
 
-	$_[HEAP]->{SESSION_ID} = $_[SESSION]->ID();
+	$heap->{SESSION_ID} = $_[SESSION]->ID();
 
 	# Register an alias for ourself
-	$_[KERNEL]->alias_set( $_[HEAP]->{'ALIAS'} ) if $_[HEAP]->{'ALIAS'};
-	$_[KERNEL]->refcount_increment( $_[HEAP]->{SESSION_ID}, __PACKAGE__ ) unless $_[HEAP]->{'ALIAS'};
+	$poe_kernel->alias_set( $heap->{'ALIAS'} ) if $heap->{'ALIAS'};
+	$poe_kernel->refcount_increment( $heap->{SESSION_ID}, __PACKAGE__ ) unless $heap->{'ALIAS'};
 
 	# Massage the handlers!
-	MassageHandlers( $_[HEAP]->{'HANDLERS'} );
+	MassageHandlers( $heap->{'HANDLERS'} );
 
 	# Setup the wheel
-	$_[KERNEL]->yield( 'SetupListener' );
+	$poe_kernel->yield( 'SetupListener' );
 
 	# All done!
 	return 1;
@@ -426,33 +428,36 @@ sub StopServer {
 # Sets up the SocketFactory wheel :)
 sub SetupListener {
 	# Debug stuff
+	my $heap = $_[HEAP];
 	if ( DEBUG ) {
 		warn 'Creating SocketFactory wheel now';
 	}
 
 	# Check if we should set up the wheel
-	if ( $_[HEAP]->{'RETRIES'} == MAX_RETRIES ) {
+	if ( $heap->{'RETRIES'} == MAX_RETRIES ) {
 		die 'POE::Component::Server::SimpleHTTP tried ' . MAX_RETRIES . ' times to create a Wheel and is giving up...';
 	} 
 	else {
 		# Increment the retry count if we did not get 'NOINC' as an argument
 		if ( ! defined $_[ARG0] ) {
 			# Increment the retries count
-			$_[HEAP]->{'RETRIES'}++;
+			$heap->{'RETRIES'}++;
 		}
 
 		# Create our own SocketFactory Wheel :)
-		$_[HEAP]->{'SOCKETFACTORY'} = POE::Wheel::SocketFactory->new(
-			'BindPort'	=>	$_[HEAP]->{'PORT'},
-			'BindAddress'	=>	$_[HEAP]->{'ADDRESS'},
+		$heap->{'SOCKETFACTORY'} = POE::Wheel::SocketFactory->new(
+			'BindPort'	=>	$heap->{'PORT'},
+			'BindAddress'	=>	$heap->{'ADDRESS'},
 			'Reuse'		=>	'yes',
 			'SuccessEvent'	=>	'Got_Connection',
 			'FailureEvent'	=>	'ListenerError',
 		);
-	        $_[KERNEL]->post(
-	   		$_[HEAP]->{'SETUPHANDLER'}->{'SESSION'},
-	   		$_[HEAP]->{'SETUPHANDLER'}->{'EVENT'},
-		) if $_[HEAP]->{'SETUPHANDLER'};
+		my ($port,$address) = sockaddr_in( $heap->{'SOCKETFACTORY'}->getsockname );
+		$heap->{'PORT'} = $port if $heap->{'PORT'} == 0;
+	        $poe_kernel->post(
+	   		$heap->{'SETUPHANDLER'}->{'SESSION'},
+	   		$heap->{'SETUPHANDLER'}->{'EVENT'}, $port, $address,
+		) if $heap->{'SETUPHANDLER'};
 	}
 
 	# Success!
@@ -813,6 +818,7 @@ sub Got_Input {
 			'BadRequest (by POE::Filter::HTTPD)', $response->connection->remote_ip()
 		);
 		$_[KERNEL]->yield('DONE', $response);
+		return;
 	} 
 	else {
 	   # Find which handler will handle this one
@@ -842,6 +848,7 @@ sub Got_Input {
 		$response->content('404 Not Found');
         $_[KERNEL]->yield('DONE', $response);
 	}
+	return;
 }
 
 # Finished with a request!
