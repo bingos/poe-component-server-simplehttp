@@ -1,6 +1,23 @@
-==============================
-9999-99-99 99:99:99 (untagged)
-==============================
+===========================
+2009-01-20 16:07:32 1.53_01
+===========================
+
+  2009-01-20 16:06:43 (r131) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Give it a development version and ship for the CPAN Testers to smoke
+
+  2009-01-20 16:00:37 (r130) by bingos
+  t/05_post.t A; t/02_simple.t A; t/08_post.t D; t/04_run_close.t A;
+  t/04_run_keepalive.t A; t/03_pod_coverage.t D;
+  lib/POE/Component/Server/SimpleHTTP.pm M; t/03_bad_request.t A;
+  MANIFEST M; Changes M; t/99_pod.t A; t/07_bad_request.t D;
+  t/11_keepalive.t D; t/04_test_kwalitee.t D; t/05_run.t D;
+  t/99_pod_coverage.t A; Makefile.PL M; t/02_pod.t D; t/03_bad_handler.t
+  A
+
+    Houston we appear to have a refactored testsuite. Yes, it really
+    works. And consistently as well. hurrah
 
   2009-01-19 21:23:03 (r128) by bingos
   t/05_run.t M; t/07_bad_request.t M; t/11_keepalive.t M

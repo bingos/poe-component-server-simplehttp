@@ -9,7 +9,7 @@ use vars qw($VERSION);
 
 # Initialize our version
 # $Revision: 1181 $
-$VERSION = '1.53_01';
+$VERSION = '1.53_02';
 
 # Import what we need from the POE namespace
 use POE;

@@ -20,6 +20,7 @@ requires    'HTTP::Response'   =>    0;
 
 build_requires   'Test::More'                   => 0.47;
 build_requires	 'HTTP::Parser'			=> 0.04;
+build_requires	 'Test::POE::Client::TCP'	=> 0.10;
 
 my $value = prompt( 'Do you want to test streaming ( requires POE::Component::Client::HTTP ) [y/N]?', 'N' );
 build_requires   'POE::Component::Client::HTTP' => 0.82 if $value =~ /^Y$/i;
