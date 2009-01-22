@@ -97,12 +97,11 @@ sub _run_tests {
   my ($kernel,$heap) = @_[KERNEL,HEAP];
   $heap->{parser} = HTTP::Parser->new( response => 1 );
   my $test = shift @{ $heap->{tests} };
+  return unless $test;
   my $path = $test->[0];
   $heap->{current_tests} = $test->[1];
   my $keepalive = '';
-#  if ( scalar @{ $heap->{tests} } ) {
-    $keepalive = "Keep-Alive: 300\x0D\x0AConnection: keep-alive\x0D\x0A";
-#  }
+  $keepalive = "Keep-Alive: 300\x0D\x0AConnection: keep-alive\x0D\x0A";
   $heap->{webc}->send_to_server("GET $path HTTP/1.1\x0D\x0AHost: 127.0.0.1:$heap->{port}\x0D\x0A$keepalive\x0D\x0A");
   return;
 }

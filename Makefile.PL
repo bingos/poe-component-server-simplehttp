@@ -1,6 +1,8 @@
 #use ExtUtils::MakeMaker;
 use inc::Module::Install;
 
+$ENV{PERL_MM_USE_DEFAULT}=1 if $Module::Install::AUTHOR;
+
 name 'POE-Component-Server-SimpleHTTP';
 author 'Apocalypse <APOCAL@cpan.org>';
 license 'perl';

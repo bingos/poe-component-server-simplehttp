@@ -1,4 +1,14 @@
 ===========================
+2009-01-21 14:05:58 1.53_02
+===========================
+
+  2009-01-21 14:05:18 (r133) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; Makefile.PL M; Changes M
+
+    Forgot the dependency on Test::POE::Client::TCP for the new tests.
+    doh.
+
+===========================
 2009-01-20 16:07:32 1.53_01
 ===========================
 
