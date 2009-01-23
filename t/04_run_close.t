@@ -7,7 +7,7 @@ use POE qw(Component::Server::SimpleHTTP Filter::Stream);
 use Test::POE::Client::TCP;
 use HTTP::Request;
 use HTTP::Response;
-use HTTP::Parser;
+use POE::Filter::HTTP::Parser;
 
 my @tests = ( 
 [ '/', { code => '200', content => 'this is top' } ],
@@ -73,10 +73,9 @@ sub _tests {
 	port    	=> $port,
 	autoconnect 	=> 1,
 	prefix  	=> 'webc',
-	filter		=> POE::Filter::Stream->new(),
+	filter		=> POE::Filter::HTTP::Parser->new(),
   );
   $heap->{port} = $port;
-  $heap->{parser} = HTTP::Parser->new( response => 1 );
   return;
 }
 
@@ -85,15 +84,15 @@ sub webc_connected {
   my $test = shift @{ $heap->{tests} };
   my $path = $test->[0];
   $heap->{current_tests} = $test->[1];
-  $heap->{webc}->send_to_server("GET $path HTTP/1.1\x0D\x0AHost: 127.0.0.1:$heap->{port}\x0D\x0A\x0D\x0A");
+  my $req = HTTP::Request->new( GET => $path );
+  $req->header( Host => "127.0.0.1:$heap->{port}" );
+  $req->protocol( 'HTTP/1.1' );
+  $heap->{webc}->send_to_server( $req );
   return;
 }
 
 sub webc_input {
-  my ($heap,$input) = @_[HEAP,ARG0];
-  my $status = $heap->{parser}->add($input);
-  if ( $status == 0 ) {
-     my $resp = $heap->{parser}->object();
+  my ($heap,$resp) = @_[HEAP,ARG0];
      isa_ok( $resp, 'HTTP::Response' );
      diag($resp->as_string);
      my $tests = delete $heap->{current_tests};
@@ -108,9 +107,6 @@ sub webc_input {
 	   like( $resp->content, qr/$tests->{$test}/, 'Content: ' . $tests->{$test} );
 	}
      }
-  }
-  else {
-  }
   return;
 }
 

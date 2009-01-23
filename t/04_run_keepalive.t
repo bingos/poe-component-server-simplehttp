@@ -8,7 +8,7 @@ use POE qw(Component::Server::SimpleHTTP Filter::Stream);
 use Test::POE::Client::TCP;
 use HTTP::Request;
 use HTTP::Response;
-use HTTP::Parser;
+use POE::Filter::HTTP::Parser;
 
 my @tests = ( 
 [ '/', { code => '200', content => 'this is top' } ],
@@ -80,10 +80,9 @@ sub _tests {
 	port    	=> $port,
 	autoconnect 	=> 1,
 	prefix  	=> 'webc',
-	filter		=> POE::Filter::Stream->new(),
+	filter		=> POE::Filter::HTTP::Parser->new(),
   );
   $heap->{port} = $port;
-  $heap->{parser} = HTTP::Parser->new( response => 1 );
   return;
 }
 
@@ -100,17 +99,23 @@ sub _run_tests {
   return unless $test;
   my $path = $test->[0];
   $heap->{current_tests} = $test->[1];
-  my $keepalive = '';
-  $keepalive = "Keep-Alive: 300\x0D\x0AConnection: keep-alive\x0D\x0A";
-  $heap->{webc}->send_to_server("GET $path HTTP/1.1\x0D\x0AHost: 127.0.0.1:$heap->{port}\x0D\x0A$keepalive\x0D\x0A");
+  my $req = HTTP::Request->new( GET => $path );
+  $req->protocol( 'HTTP/1.1' );
+  $req->header( 'Host', "127.0.0.1:$heap->{port}" );
+  $req->header( 'Keep-Alive', 300 );
+  $req->header( 'Connection', 'keep-alive' );
+#  my $keepalive = '';
+#  $keepalive = "Keep-Alive: 300\x0D\x0AConnection: keep-alive\x0D\x0A";
+#  $heap->{webc}->send_to_server("GET $path HTTP/1.1\x0D\x0AHost: 127.0.0.1:$heap->{port}\x0D\x0A$keepalive\x0D\x0A");
+  $heap->{webc}->send_to_server( $req );
   return;
 }
 
 sub webc_input {
-  my ($heap,$input) = @_[HEAP,ARG0];
-  my $status = $heap->{parser}->add($input);
-  if ( $status == 0 ) {
-     my $resp = $heap->{parser}->object();
+  my ($heap,$resp) = @_[HEAP,ARG0];
+#  my $status = $heap->{parser}->add($input);
+#  if ( $status == 0 ) {
+#     my $resp = $heap->{parser}->object();
      isa_ok( $resp, 'HTTP::Response' );
      diag($resp->as_string);
      my $tests = delete $heap->{current_tests};
@@ -126,9 +131,9 @@ sub webc_input {
 	}
      }
      $poe_kernel->yield( '_run_tests' );
-  }
-  else {
-  }
+#  }
+#  else {
+#  }
   return;
 }
 

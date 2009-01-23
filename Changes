@@ -1,4 +1,19 @@
 ===========================
+2009-01-22 08:50:54 1.53_03
+===========================
+
+  2009-01-22 08:50:31 (r136) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M
+
+    Bump development release version
+
+  2009-01-22 08:49:21 (r135) by bingos
+  t/04_run_keepalive.t M; lib/POE/Component/Server/SimpleHTTP.pm M;
+  Makefile.PL M; Changes M
+
+    Ran perltidy against SimpleHTTP.pm, fixed keepalive test
+
+===========================
 2009-01-21 14:05:58 1.53_02
 ===========================
 

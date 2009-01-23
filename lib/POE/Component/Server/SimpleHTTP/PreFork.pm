@@ -2,8 +2,8 @@
 package POE::Component::Server::SimpleHTTP::PreFork;
 
 # Standard stuff to catch errors
-use strict qw(subs vars refs);				# Make sure we can't mess up
-use warnings;				# Enable warnings to catch errors
+use strict qw(subs vars refs);    # Make sure we can't mess up
+use warnings;                     # Enable warnings to catch errors
 
 # Initialize our version
 # $Revision: 1181 $
@@ -24,1079 +24,1220 @@ use IPC::Shareable qw( :lock );
 
 # Set some constants
 BEGIN {
-	# Interval at which to check spares
-	if ( ! defined &CHECKSPARES_INTERVAL ) {
-		eval "sub CHECKSPARES_INTERVAL () { 1 }";
-	}
 
-	# Interval at which to retry preforking
-	if ( ! defined &PREFORK_INTERVAL ) {
-		eval "sub PREFORK_INTERVAL () { 5 }";
-	}
+   # Interval at which to check spares
+   if ( !defined &CHECKSPARES_INTERVAL ) {
+      eval "sub CHECKSPARES_INTERVAL () { 1 }";
+   }
 
-	# If true, show the scoreboard every second
-	if ( ! defined &DEBUGSB ) {
-		eval "sub DEBUGSB () { 0 }";
-	}
+   # Interval at which to retry preforking
+   if ( !defined &PREFORK_INTERVAL ) {
+      eval "sub PREFORK_INTERVAL () { 5 }";
+   }
+
+   # If true, show the scoreboard every second
+   if ( !defined &DEBUGSB ) {
+      eval "sub DEBUGSB () { 0 }";
+   }
 }
 
 # Set things in motion!
 sub new {
-	# Get the OOP's type
-	my $type = shift;
 
-	# Sanity checking
-	if ( @_ & 1 ) {
-		croak( 'POE::Component::Server::SimpleHTTP::PreFork->new needs even number of options' );
-	}
+   # Get the OOP's type
+   my $type = shift;
 
-	# The options hash
-	my %opt = @_;
+   # Sanity checking
+   if ( @_ & 1 ) {
+      croak(
+'POE::Component::Server::SimpleHTTP::PreFork->new needs even number of options'
+      );
+   }
 
-	# Our own options
-	my ( $ALIAS, $ADDRESS, $PORT, $HOSTNAME, $HEADERS, $HANDLERS, $SSLKEYCERT );
-	# options for pre-forking
-	my ( $FORKHANDLERS, $STARTSERVERS, $MINSPARESERVERS, $MAXSPARESERVERS, $MAXCLIENTS, $MAXREQUESTPERCHILD );
+   # The options hash
+   my %opt = @_;
 
-	# You could say I should do this: $Stuff = delete $opt{'Stuff'}
-	# But, that kind of behavior is not defined, so I would not trust it...
+   # Our own options
+   my ( $ALIAS, $ADDRESS, $PORT, $HOSTNAME, $HEADERS, $HANDLERS, $SSLKEYCERT );
 
-	# Get the SSL array
-	if ( exists $opt{'SSLKEYCERT'} and defined $opt{'SSLKEYCERT'} ) {
-		# Test if it is an array
-		if ( ref( $opt{'SSLKEYCERT'} ) eq 'ARRAY' and scalar( @{ $opt{'SSLKEYCERT'} } ) == 2 ) {
-			$SSLKEYCERT = $opt{'SSLKEYCERT'};
-			delete $opt{'SSLKEYCERT'};
+   # options for pre-forking
+   my (
+      $FORKHANDLERS,    $STARTSERVERS, $MINSPARESERVERS,
+      $MAXSPARESERVERS, $MAXCLIENTS,   $MAXREQUESTPERCHILD
+   );
 
-			# Okay, pull in what is necessary
-			eval {
-				use POE::Component::SSLify qw( SSLify_Options SSLify_GetSocket Server_SSLify SSLify_GetCipher );
-				SSLify_Options( @$SSLKEYCERT );
-			};
-			if ( $@ ) {
-				if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-					warn "Unable to load PoCo::SSLify -> $@";
-				}
+   # You could say I should do this: $Stuff = delete $opt{'Stuff'}
+   # But, that kind of behavior is not defined, so I would not trust it...
 
-				# Force ourself to not use SSL
-				$SSLKEYCERT = undef;
-			}
-		} else {
-			if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-				warn 'The SSLKEYCERT option must be an array with exactly 2 elements in it!';
-			}
-		}
-	} else {
-		$SSLKEYCERT = undef;
-	}
+   # Get the SSL array
+   if ( exists $opt{'SSLKEYCERT'} and defined $opt{'SSLKEYCERT'} ) {
 
-	# Get the session alias
-	if ( exists $opt{'ALIAS'} and defined $opt{'ALIAS'} and length( $opt{'ALIAS'} ) ) {
-		$ALIAS = $opt{'ALIAS'};
-		delete $opt{'ALIAS'};
-	} else {
-		# Debugging info...
-		if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-			warn 'Using default ALIAS = SimpleHTTP';
-		}
+      # Test if it is an array
+      if ( ref( $opt{'SSLKEYCERT'} ) eq 'ARRAY'
+         and scalar( @{ $opt{'SSLKEYCERT'} } ) == 2 )
+      {
+         $SSLKEYCERT = $opt{'SSLKEYCERT'};
+         delete $opt{'SSLKEYCERT'};
 
-		# Set the default
-		$ALIAS = 'SimpleHTTP';
+         # Okay, pull in what is necessary
+         eval {
+            use POE::Component::SSLify
+              qw( SSLify_Options SSLify_GetSocket Server_SSLify SSLify_GetCipher );
+            SSLify_Options(@$SSLKEYCERT);
+         };
+         if ($@) {
+            if (POE::Component::Server::SimpleHTTP::DEBUG) {
+               warn "Unable to load PoCo::SSLify -> $@";
+            }
 
-		# Get rid of any lingering ALIAS
-		if ( exists $opt{'ALIAS'} ) {
-			delete $opt{'ALIAS'};
-		}
-	}
+            # Force ourself to not use SSL
+            $SSLKEYCERT = undef;
+         }
+      }
+      else {
+         if (POE::Component::Server::SimpleHTTP::DEBUG) {
+            warn
+'The SSLKEYCERT option must be an array with exactly 2 elements in it!';
+         }
+      }
+   }
+   else {
+      $SSLKEYCERT = undef;
+   }
 
-	# Get the PORT
-	if ( exists $opt{'PORT'} and defined $opt{'PORT'} and length( $opt{'PORT'} ) ) {
-		$PORT = $opt{'PORT'};
-		delete $opt{'PORT'};
-	} else {
-		croak( 'PORT is required to create a new POE::Component::Server::SimpleHTTP instance!' );
-	}
+   # Get the session alias
+   if (   exists $opt{'ALIAS'}
+      and defined $opt{'ALIAS'}
+      and length( $opt{'ALIAS'} ) )
+   {
+      $ALIAS = $opt{'ALIAS'};
+      delete $opt{'ALIAS'};
+   }
+   else {
 
-	# Get the ADDRESS
-	if ( exists $opt{'ADDRESS'} and defined $opt{'ADDRESS'} and length( $opt{'ADDRESS'} ) ) {
-		$ADDRESS = $opt{'ADDRESS'};
-		delete $opt{'ADDRESS'};
-	} else {
-		croak( 'ADDRESS is required to create a new POE::Component::Server::SimpleHTTP instance!' );
-	}
+      # Debugging info...
+      if (POE::Component::Server::SimpleHTTP::DEBUG) {
+         warn 'Using default ALIAS = SimpleHTTP';
+      }
 
-	# Get the HOSTNAME
-	if ( exists $opt{'HOSTNAME'} and defined $opt{'HOSTNAME'} and length( $opt{'HOSTNAME'} ) ) {
-		$HOSTNAME = $opt{'HOSTNAME'};
-		delete $opt{'HOSTNAME'};
-	} else {
-		if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-			warn 'Using Sys::Hostname for HOSTNAME';
-		}
+      # Set the default
+      $ALIAS = 'SimpleHTTP';
 
-		# Figure out the hostname
-		require Sys::Hostname;
-		$HOSTNAME = Sys::Hostname::hostname();
+      # Get rid of any lingering ALIAS
+      if ( exists $opt{'ALIAS'} ) {
+         delete $opt{'ALIAS'};
+      }
+   }
 
-		# Get rid of any lingering HOSTNAME
-		if ( exists $opt{'HOSTNAME'} ) {
-			delete $opt{'HOSTNAME'};
-		}
-	}
+   # Get the PORT
+   if (   exists $opt{'PORT'}
+      and defined $opt{'PORT'}
+      and length( $opt{'PORT'} ) )
+   {
+      $PORT = $opt{'PORT'};
+      delete $opt{'PORT'};
+   }
+   else {
+      croak(
+'PORT is required to create a new POE::Component::Server::SimpleHTTP instance!'
+      );
+   }
 
-	# Get the HEADERS
-	if ( exists $opt{'HEADERS'} and defined $opt{'HEADERS'} ) {
-		# Make sure it is ref to hash
-		if ( ref $opt{'HEADERS'} and ref( $opt{'HEADERS'} ) eq 'HASH' ) {
-			$HEADERS = $opt{'HEADERS'};
-			delete $opt{'HEADERS'};
-		} else {
-			croak( 'HEADERS must be a reference to a HASH!' );
-		}
-	} else {
-		# Set to none
-		$HEADERS = {};
+   # Get the ADDRESS
+   if (   exists $opt{'ADDRESS'}
+      and defined $opt{'ADDRESS'}
+      and length( $opt{'ADDRESS'} ) )
+   {
+      $ADDRESS = $opt{'ADDRESS'};
+      delete $opt{'ADDRESS'};
+   }
+   else {
+      croak(
+'ADDRESS is required to create a new POE::Component::Server::SimpleHTTP instance!'
+      );
+   }
 
-		# Get rid of any lingering HEADERS
-		if ( exists $opt{'HEADERS'} ) {
-			delete $opt{'HEADERS'};
-		}
-	}
+   # Get the HOSTNAME
+   if (   exists $opt{'HOSTNAME'}
+      and defined $opt{'HOSTNAME'}
+      and length( $opt{'HOSTNAME'} ) )
+   {
+      $HOSTNAME = $opt{'HOSTNAME'};
+      delete $opt{'HOSTNAME'};
+   }
+   else {
+      if (POE::Component::Server::SimpleHTTP::DEBUG) {
+         warn 'Using Sys::Hostname for HOSTNAME';
+      }
 
-	# Get the HANDLERS
-	if ( exists $opt{'HANDLERS'} and defined $opt{'HANDLERS'} ) {
-		# Make sure it is ref to array
-		if ( ref $opt{'HANDLERS'} and ref( $opt{'HANDLERS'} ) eq 'ARRAY' ) {
-			$HANDLERS = $opt{'HANDLERS'};
-			delete $opt{'HANDLERS'};
-		} else {
-			croak( 'HANDLERS must be a reference to an ARRAY!' );
-		}
-	} else {
-		croak( 'HANDLERS is required to create a new POE::Component::Server::SimpleHTTP instance!' );
-	}
+      # Figure out the hostname
+      require Sys::Hostname;
+      $HOSTNAME = Sys::Hostname::hostname();
 
-	# Get the FORKHANDLERS
-	if ( exists $opt{'FORKHANDLERS'} and defined $opt{'FORKHANDLERS'} ) {
-		# Make sure it is ref to a hash
-		if ( ref $opt{'FORKHANDLERS'} and ref( $opt{'FORKHANDLERS'} ) eq 'HASH' ) {
-			$FORKHANDLERS = $opt{'FORKHANDLERS'};
-			delete $opt{'FORKHANDLERS'};
-		} else {
-			croak( 'FORKHANDLERS must be a reference to a HASH!' );
-		}
-	} else {
-		$FORKHANDLERS = {};
+      # Get rid of any lingering HOSTNAME
+      if ( exists $opt{'HOSTNAME'} ) {
+         delete $opt{'HOSTNAME'};
+      }
+   }
 
-		# Get rid of any lingering FORKHANDLERS
-		if ( exists $opt{'FORKHANDLERS'} ) {
-			delete $opt{'FORKHANDLERS'};
-		}
-	}
+   # Get the HEADERS
+   if ( exists $opt{'HEADERS'} and defined $opt{'HEADERS'} ) {
 
-	# Get the MINSPARESERVERS
-	if ( exists $opt{'MINSPARESERVERS'} and defined $opt{'MINSPARESERVERS'} ) {
-		$MINSPARESERVERS = int $opt{'MINSPARESERVERS'};
-		delete $opt{'MINSPARESERVERS'};
+      # Make sure it is ref to hash
+      if ( ref $opt{'HEADERS'} and ref( $opt{'HEADERS'} ) eq 'HASH' ) {
+         $HEADERS = $opt{'HEADERS'};
+         delete $opt{'HEADERS'};
+      }
+      else {
+         croak('HEADERS must be a reference to a HASH!');
+      }
+   }
+   else {
 
-		if ( $MINSPARESERVERS <= 0 ) {
-			croak( 'MINSPARESERVERS must be greater than 0!' );
-		}
-	} else {
-		$MINSPARESERVERS = 5;
+      # Set to none
+      $HEADERS = {};
 
-		# Get rid of any lingering MINSPARESERVERS
-		if ( exists $opt{'MINSPARESERVERS'} ) {
-			delete $opt{'MINSPARESERVERS'};
-		}
-	}
+      # Get rid of any lingering HEADERS
+      if ( exists $opt{'HEADERS'} ) {
+         delete $opt{'HEADERS'};
+      }
+   }
 
-	# Get the MAXSPARESERVERS
-	if (exists $opt{'MAXSPARESERVERS'} and defined $opt{'MAXSPARESERVERS'} ) {
-		$MAXSPARESERVERS = int $opt{'MAXSPARESERVERS'};
-		delete $opt{'MAXSPARESERVERS'};
-	} else {
-		$MAXSPARESERVERS = 10;
+   # Get the HANDLERS
+   if ( exists $opt{'HANDLERS'} and defined $opt{'HANDLERS'} ) {
 
-		# Get rid of any lingering MAXSPARESERVERS
-		if ( exists $opt{'MAXSPARESERVERS'} ) {
-			delete $opt{'MAXSPARESERVERS'};
-		}
-	}
-	# Adjust and make sure MAXSPARESERVERS makes sense
-	if ( $MAXSPARESERVERS <= $MINSPARESERVERS ) {
-		if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-			warn 'MAXSPARESERVERS is less than or equal to MINSPARESERVERS. Resetting.';
-		}
+      # Make sure it is ref to array
+      if ( ref $opt{'HANDLERS'} and ref( $opt{'HANDLERS'} ) eq 'ARRAY' ) {
+         $HANDLERS = $opt{'HANDLERS'};
+         delete $opt{'HANDLERS'};
+      }
+      else {
+         croak('HANDLERS must be a reference to an ARRAY!');
+      }
+   }
+   else {
+      croak(
+'HANDLERS is required to create a new POE::Component::Server::SimpleHTTP instance!'
+      );
+   }
 
-		$MAXSPARESERVERS = $MINSPARESERVERS + 1;
-	}
+   # Get the FORKHANDLERS
+   if ( exists $opt{'FORKHANDLERS'} and defined $opt{'FORKHANDLERS'} ) {
 
-	# Get the MAXCLIENTS
-	if (exists $opt{'MAXCLIENTS'} and defined $opt{'MAXCLIENTS'} ) {
-		$MAXCLIENTS = int $opt{'MAXCLIENTS'};
-		delete $opt{'MAXCLIENTS'};
-	} else {
-		$MAXCLIENTS = 256;
+      # Make sure it is ref to a hash
+      if ( ref $opt{'FORKHANDLERS'} and ref( $opt{'FORKHANDLERS'} ) eq 'HASH' )
+      {
+         $FORKHANDLERS = $opt{'FORKHANDLERS'};
+         delete $opt{'FORKHANDLERS'};
+      }
+      else {
+         croak('FORKHANDLERS must be a reference to a HASH!');
+      }
+   }
+   else {
+      $FORKHANDLERS = {};
 
-		# Get rid of any lingering MAXCLIENTS
-		if ( exists $opt{'MAXCLIENTS'} ) {
-			delete $opt{'MAXCLIENTS'};
-		}
-	}
+      # Get rid of any lingering FORKHANDLERS
+      if ( exists $opt{'FORKHANDLERS'} ) {
+         delete $opt{'FORKHANDLERS'};
+      }
+   }
 
-	# Get the MAXREQUESTPERCHILD
-	if (exists $opt{'MAXREQUESTPERCHILD'} and defined $opt{'MAXREQUESTPERCHILD'} ) {
-		$MAXREQUESTPERCHILD = int $opt{'MAXREQUESTPERCHILD'};
-		delete $opt{'MAXREQUESTPERCHILD'};
+   # Get the MINSPARESERVERS
+   if ( exists $opt{'MINSPARESERVERS'} and defined $opt{'MINSPARESERVERS'} ) {
+      $MINSPARESERVERS = int $opt{'MINSPARESERVERS'};
+      delete $opt{'MINSPARESERVERS'};
 
-		if ( $MAXREQUESTPERCHILD <= 0 ) {
-			croak( 'MAXREQUESTPERCHILD must be greater than 0!' );
-		}
-	}
-        
-	# Get the STARTSERVERS
-	if (exists $opt{'STARTSERVERS'} and defined $opt{'STARTSERVERS'} ) {
-		$STARTSERVERS = int $opt{'STARTSERVERS'};
-		delete $opt{'STARTSERVERS'};
+      if ( $MINSPARESERVERS <= 0 ) {
+         croak('MINSPARESERVERS must be greater than 0!');
+      }
+   }
+   else {
+      $MINSPARESERVERS = 5;
 
-		if ( $STARTSERVERS <= 0 ) {
-			croak( 'STARTSERVERS must be greater than or equal to 0!' );
-		}
-	} else {
-		$STARTSERVERS = 10;
+      # Get rid of any lingering MINSPARESERVERS
+      if ( exists $opt{'MINSPARESERVERS'} ) {
+         delete $opt{'MINSPARESERVERS'};
+      }
+   }
 
-		# Get rid of any lingering STARTSERVERS
-		if ( exists $opt{'STARTSERVERS'} ) {
-			delete $opt{'STARTSERVERS'};
-		}
-	}
-	# Adjust and make sure STARTSERVERS makes sense
-	if ( $STARTSERVERS < $MINSPARESERVERS ) {
-		if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-			warn 'STARTSERVERS is less than MINSPARESERVERS. Resetting.';
-		}
+   # Get the MAXSPARESERVERS
+   if ( exists $opt{'MAXSPARESERVERS'} and defined $opt{'MAXSPARESERVERS'} ) {
+      $MAXSPARESERVERS = int $opt{'MAXSPARESERVERS'};
+      delete $opt{'MAXSPARESERVERS'};
+   }
+   else {
+      $MAXSPARESERVERS = 10;
 
-		$STARTSERVERS = $MINSPARESERVERS;
-	}
+      # Get rid of any lingering MAXSPARESERVERS
+      if ( exists $opt{'MAXSPARESERVERS'} ) {
+         delete $opt{'MAXSPARESERVERS'};
+      }
+   }
 
-	# Anything left over is unrecognized
-	if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-		if ( keys %opt > 0 ) {
-			croak( 'Unrecognized options were present in POE::Component::Server::SimpleHTTP::PreFork->new -> ' . join( ', ', keys %opt ) );
-		}
-	}
+   # Adjust and make sure MAXSPARESERVERS makes sense
+   if ( $MAXSPARESERVERS <= $MINSPARESERVERS ) {
+      if (POE::Component::Server::SimpleHTTP::DEBUG) {
+         warn
+'MAXSPARESERVERS is less than or equal to MINSPARESERVERS. Resetting.';
+      }
 
-	# Create a new session for ourself
-	POE::Session->create(
-		# Our subroutines
-		'inline_states'	=>	{
-			# Maintenance events
-			'_start'		=>	\&StartServer,
-			'_stop'			=>	\&POE::Component::Server::SimpleHTTP::FindRequestLeaks,
-			'_child'		=>	sub {},
+      $MAXSPARESERVERS = $MINSPARESERVERS + 1;
+   }
 
-			# Pre-forking events
-			'ISCHILD'		=>	\&IsChild,
-			'GETFORKHANDLERS'	=>	\&GetForkHandlers,
-			'SETFORKHANDLERS'	=>	\&SetForkHandlers,
+   # Get the MAXCLIENTS
+   if ( exists $opt{'MAXCLIENTS'} and defined $opt{'MAXCLIENTS'} ) {
+      $MAXCLIENTS = int $opt{'MAXCLIENTS'};
+      delete $opt{'MAXCLIENTS'};
+   }
+   else {
+      $MAXCLIENTS = 256;
 
-			# Internal pre-forking events
-			'SigCHLD'		=>	\&SigCHLD,
-			'SigTERM'		=>	\&SigTERM,
-			'PreFork'		=>	\&PreFork,
-			'KillChildren'		=>	\&KillChildren,
-			'CheckSpares'		=>	\&CheckSpares,
-			'UpdateScoreboard'	=>	\&UpdateScoreboard,
-			'AddScoreboard'		=>	\&AddScoreboard,
-			'ShowScoreboard'	=>	\&ShowScoreboard,
+      # Get rid of any lingering MAXCLIENTS
+      if ( exists $opt{'MAXCLIENTS'} ) {
+         delete $opt{'MAXCLIENTS'};
+      }
+   }
 
-			# HANDLER stuff
-			'GETHANDLERS'		=>	\&POE::Component::Server::SimpleHTTP::GetHandlers,
-			'SETHANDLERS'		=>	\&SetHandlers,
+   # Get the MAXREQUESTPERCHILD
+   if ( exists $opt{'MAXREQUESTPERCHILD'}
+      and defined $opt{'MAXREQUESTPERCHILD'} )
+   {
+      $MAXREQUESTPERCHILD = int $opt{'MAXREQUESTPERCHILD'};
+      delete $opt{'MAXREQUESTPERCHILD'};
 
-			# SocketFactory events
-			'SHUTDOWN'		=>	\&StopServer,
-			'STOPLISTEN'		=>	\&StopListen,
-			'STARTLISTEN'		=>	\&StartListen,
-			'SetupListener'		=>	\&SetupListener,
-			'ListenerError'		=>	\&POE::Component::Server::SimpleHTTP::ListenerError,
+      if ( $MAXREQUESTPERCHILD <= 0 ) {
+         croak('MAXREQUESTPERCHILD must be greater than 0!');
+      }
+   }
 
-			# Wheel::ReadWrite stuff
-			'Got_Connection'	=>	\&Got_Connection,
-			'Got_Input'		=>	\&Got_Input,
-			'Got_Flush'		=>	\&Got_Flush,
-			'Got_Error'		=>	\&Got_Error,
+   # Get the STARTSERVERS
+   if ( exists $opt{'STARTSERVERS'} and defined $opt{'STARTSERVERS'} ) {
+      $STARTSERVERS = int $opt{'STARTSERVERS'};
+      delete $opt{'STARTSERVERS'};
 
-			# Send output to connection!
-			'DONE'		=>	\&POE::Component::Server::SimpleHTTP::Request_Output,
-                        
-			# Stream output to connection!
-			'STREAM'	   =>	\&POE::Component::Server::SimpleHTTP::Stream_Output,
+      if ( $STARTSERVERS <= 0 ) {
+         croak('STARTSERVERS must be greater than or equal to 0!');
+      }
+   }
+   else {
+      $STARTSERVERS = 10;
 
-			# Kill the connection!
-			'CLOSE'		=>	\&Request_Close,
-		},
+      # Get rid of any lingering STARTSERVERS
+      if ( exists $opt{'STARTSERVERS'} ) {
+         delete $opt{'STARTSERVERS'};
+      }
+   }
 
-		# Set up the heap for ourself
-		'heap'		=>	{
-			'ALIAS'			=>	$ALIAS,
-			'ADDRESS'		=>	$ADDRESS,
-			'PORT'			=>	$PORT,
-			'HEADERS'		=>	$HEADERS,
-			'HOSTNAME'		=>	$HOSTNAME,
-			'HANDLERS'		=>	$HANDLERS,
-			'REQUESTS'		=>	{},
-			'RETRIES'		=>	0,
-			'SSLKEYCERT'		=>	$SSLKEYCERT,
-			'MINSPARESERVERS'	=>	$MINSPARESERVERS,
-			'MAXSPARESERVERS'	=>	$MAXSPARESERVERS,
-			'MAXCLIENTS'		=>	$MAXCLIENTS,
-			'STARTSERVERS'		=>	$STARTSERVERS,
-			'MAXREQUESTPERCHILD'	=>	$MAXREQUESTPERCHILD,
-			'ISCHILD'		=>	0,
-			'FORKHANDLERS'		=>	$FORKHANDLERS,
-			'SCOREBOARD'		=>	undef
-		},
-	) or die 'Unable to create a new session!';
+   # Adjust and make sure STARTSERVERS makes sense
+   if ( $STARTSERVERS < $MINSPARESERVERS ) {
+      if (POE::Component::Server::SimpleHTTP::DEBUG) {
+         warn 'STARTSERVERS is less than MINSPARESERVERS. Resetting.';
+      }
 
-	# Return success
-	return 1;
+      $STARTSERVERS = $MINSPARESERVERS;
+   }
+
+   # Anything left over is unrecognized
+   if (POE::Component::Server::SimpleHTTP::DEBUG) {
+      if ( keys %opt > 0 ) {
+         croak(
+'Unrecognized options were present in POE::Component::Server::SimpleHTTP::PreFork->new -> '
+              . join( ', ', keys %opt ) );
+      }
+   }
+
+   # Create a new session for ourself
+   POE::Session->create(
+
+      # Our subroutines
+      'inline_states' => {
+
+         # Maintenance events
+         '_start' => \&StartServer,
+         '_stop'  => \&POE::Component::Server::SimpleHTTP::FindRequestLeaks,
+         '_child' => sub { },
+
+         # Pre-forking events
+         'ISCHILD'         => \&IsChild,
+         'GETFORKHANDLERS' => \&GetForkHandlers,
+         'SETFORKHANDLERS' => \&SetForkHandlers,
+
+         # Internal pre-forking events
+         'SigCHLD'          => \&SigCHLD,
+         'SigTERM'          => \&SigTERM,
+         'PreFork'          => \&PreFork,
+         'KillChildren'     => \&KillChildren,
+         'CheckSpares'      => \&CheckSpares,
+         'UpdateScoreboard' => \&UpdateScoreboard,
+         'AddScoreboard'    => \&AddScoreboard,
+         'ShowScoreboard'   => \&ShowScoreboard,
+
+         # HANDLER stuff
+         'GETHANDLERS' => \&POE::Component::Server::SimpleHTTP::GetHandlers,
+         'SETHANDLERS' => \&SetHandlers,
+
+         # SocketFactory events
+         'SHUTDOWN'      => \&StopServer,
+         'STOPLISTEN'    => \&StopListen,
+         'STARTLISTEN'   => \&StartListen,
+         'SetupListener' => \&SetupListener,
+         'ListenerError' => \&POE::Component::Server::SimpleHTTP::ListenerError,
+
+         # Wheel::ReadWrite stuff
+         'Got_Connection' => \&Got_Connection,
+         'Got_Input'      => \&Got_Input,
+         'Got_Flush'      => \&Got_Flush,
+         'Got_Error'      => \&Got_Error,
+
+         # Send output to connection!
+         'DONE' => \&POE::Component::Server::SimpleHTTP::Request_Output,
+
+         # Stream output to connection!
+         'STREAM' => \&POE::Component::Server::SimpleHTTP::Stream_Output,
+
+         # Kill the connection!
+         'CLOSE' => \&Request_Close,
+      },
+
+      # Set up the heap for ourself
+      'heap' => {
+         'ALIAS'              => $ALIAS,
+         'ADDRESS'            => $ADDRESS,
+         'PORT'               => $PORT,
+         'HEADERS'            => $HEADERS,
+         'HOSTNAME'           => $HOSTNAME,
+         'HANDLERS'           => $HANDLERS,
+         'REQUESTS'           => {},
+         'RETRIES'            => 0,
+         'SSLKEYCERT'         => $SSLKEYCERT,
+         'MINSPARESERVERS'    => $MINSPARESERVERS,
+         'MAXSPARESERVERS'    => $MAXSPARESERVERS,
+         'MAXCLIENTS'         => $MAXCLIENTS,
+         'STARTSERVERS'       => $STARTSERVERS,
+         'MAXREQUESTPERCHILD' => $MAXREQUESTPERCHILD,
+         'ISCHILD'            => 0,
+         'FORKHANDLERS'       => $FORKHANDLERS,
+         'SCOREBOARD'         => undef
+      },
+   ) or die 'Unable to create a new session!';
+
+   # Return success
+   return 1;
 }
 
 # Starts the server!
 sub StartServer {
-	# Settup our signal handlers
-	$_[KERNEL]->sig( TERM => 'SigTERM' );
-	$_[KERNEL]->sig( CHLD => 'SigCHLD' );
 
-	# Call the super class method.
-	return POE::Component::Server::SimpleHTTP::StartServer( @_ );
+   # Settup our signal handlers
+   $_[KERNEL]->sig( TERM => 'SigTERM' );
+   $_[KERNEL]->sig( CHLD => 'SigCHLD' );
+
+   # Call the super class method.
+   return POE::Component::Server::SimpleHTTP::StartServer(@_);
 }
 
 # Stops the server!
 sub StopServer {
-	my $children;
+   my $children;
 
-	# Shutdown the SocketFactory wheel
-	if ( exists $_[HEAP]->{'SOCKETFACTORY'} ) {
-		delete $_[HEAP]->{'SOCKETFACTORY'};
-	}
+   # Shutdown the SocketFactory wheel
+   if ( exists $_[HEAP]->{'SOCKETFACTORY'} ) {
+      delete $_[HEAP]->{'SOCKETFACTORY'};
+   }
 
-	# Debug stuff
-	if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-		warn 'Stopped listening for new connections!';
-	}
+   # Debug stuff
+   if (POE::Component::Server::SimpleHTTP::DEBUG) {
+      warn 'Stopped listening for new connections!';
+   }
 
-	# Are we gracefully shutting down or not?
-	if ( defined $_[ARG0] and $_[ARG0] eq 'GRACEFUL' ) {
-		# Attempt to gracefully kill the children.
-		$children = $_[KERNEL]->call( $_[SESSION], 'KillChildren', 'TERM' );
+   # Are we gracefully shutting down or not?
+   if ( defined $_[ARG0] and $_[ARG0] eq 'GRACEFUL' ) {
 
-		# Check for number of requests, and children.
-		if ( (keys( %{ $_[HEAP]->{'REQUESTS'} } ) == 0) && ($children == 0) ) {
-			# Alright, shutdown anyway
+      # Attempt to gracefully kill the children.
+      $children = $_[KERNEL]->call( $_[SESSION], 'KillChildren', 'TERM' );
 
-			# Delete our alias
-			$_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} );
+      # Check for number of requests, and children.
+      if ( ( keys( %{ $_[HEAP]->{'REQUESTS'} } ) == 0 ) && ( $children == 0 ) )
+      {
 
-			# Destroy all memory segments created by this process.
-			IPC::Shareable->clean_up;
-			$_[HEAP]->{'SCOREBOARD'} = undef;
+         # Alright, shutdown anyway
 
-			# Debug stuff
-			if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-				warn 'Stopped SimpleHTTP gracefully, no requests left';
-			}
-            
-		}
+         # Delete our alias
+         $_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} );
 
-		# All done!
-		return 1;
-	}
-    
-    # CheckSpares need to know that we're shutting down
-    $_[HEAP]->{'SCOREBOARD'}->{'shutdown'} = 1;
-	
-    # Forcefully kill all the children.
-		$_[KERNEL]->call( $_[SESSION], 'KillChildren', 'KILL' );
+         # Destroy all memory segments created by this process.
+         IPC::Shareable->clean_up;
+         $_[HEAP]->{'SCOREBOARD'} = undef;
 
-		# Forcibly close all sockets that are open
-		foreach my $conn ( keys %{ $_[HEAP]->{'REQUESTS'} } ) {
-			# Can't call method "shutdown_input" on an undefined value at
-			# /usr/lib/perl5/site_perl/5.8.2/POE/Component/Server/SimpleHTTP.pm line 323.
-			if ( defined $_[HEAP]->{'REQUESTS'}->{ $conn }->[0] 
-                and defined $_[HEAP]->{'REQUESTS'}->{ $conn }->[0]->[ POE::Wheel::ReadWrite::HANDLE_INPUT ] ) {
-				$_[HEAP]->{'REQUESTS'}->{ $conn }->[0]->shutdown_input;
-				$_[HEAP]->{'REQUESTS'}->{ $conn }->[0]->shutdown_output;
-			}
+         # Debug stuff
+         if (POE::Component::Server::SimpleHTTP::DEBUG) {
+            warn 'Stopped SimpleHTTP gracefully, no requests left';
+         }
 
-			# Delete this request
-			delete $_[HEAP]->{'REQUESTS'}->{ $conn };
-		}
+      }
 
-		# Remove any shared memory segments.
-		IPC::Shareable->clean_up;
-		$_[HEAP]->{'SCOREBOARD'} = undef;
+      # All done!
+      return 1;
+   }
 
-		# Delete our alias
-		$_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} );
+   # CheckSpares need to know that we're shutting down
+   $_[HEAP]->{'SCOREBOARD'}->{'shutdown'} = 1;
 
-	# Debug stuff
-	if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-		warn 'Successfully stopped SimpleHTTP';
-	}
+   # Forcefully kill all the children.
+   $_[KERNEL]->call( $_[SESSION], 'KillChildren', 'KILL' );
 
-	# Return success
-	return 1;
+   # Forcibly close all sockets that are open
+   foreach my $conn ( keys %{ $_[HEAP]->{'REQUESTS'} } ) {
+
+   # Can't call method "shutdown_input" on an undefined value at
+   # /usr/lib/perl5/site_perl/5.8.2/POE/Component/Server/SimpleHTTP.pm line 323.
+      if (   defined $_[HEAP]->{'REQUESTS'}->{$conn}->[0]
+         and defined $_[HEAP]->{'REQUESTS'}->{$conn}->[0]
+         ->[POE::Wheel::ReadWrite::HANDLE_INPUT] )
+      {
+         $_[HEAP]->{'REQUESTS'}->{$conn}->[0]->shutdown_input;
+         $_[HEAP]->{'REQUESTS'}->{$conn}->[0]->shutdown_output;
+      }
+
+      # Delete this request
+      delete $_[HEAP]->{'REQUESTS'}->{$conn};
+   }
+
+   # Remove any shared memory segments.
+   IPC::Shareable->clean_up;
+   $_[HEAP]->{'SCOREBOARD'} = undef;
+
+   # Delete our alias
+   $_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} );
+
+   # Debug stuff
+   if (POE::Component::Server::SimpleHTTP::DEBUG) {
+      warn 'Successfully stopped SimpleHTTP';
+   }
+
+   # Return success
+   return 1;
 }
 
 # Kill all our children, and return the number we sent signals too.
 sub KillChildren {
-	my ( $heap, $sig ) = @_[ HEAP, ARG0 ];
-	my ( $children, $scoreboard, $mem ) = 0;
+   my ( $heap, $sig ) = @_[ HEAP, ARG0 ];
+   my ( $children, $scoreboard, $mem ) = 0;
 
-	# By default, kill them nicely.
-	$sig = 'TERM' unless defined $sig;
+   # By default, kill them nicely.
+   $sig = 'TERM' unless defined $sig;
 
-	# Make sure we are the parent AND preforked.
-	if ( $heap->{'ISCHILD'} == 0 ) {
-		if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-			warn "Killing children from $$ with signal $sig.";
-		}
+   # Make sure we are the parent AND preforked.
+   if ( $heap->{'ISCHILD'} == 0 ) {
+      if (POE::Component::Server::SimpleHTTP::DEBUG) {
+         warn "Killing children from $$ with signal $sig.";
+      }
 
-		$scoreboard = $heap->{'SCOREBOARD'};
-		$mem = tied %$scoreboard;
-		if ( not defined $mem ) {
-			# There was an error, but there's nothing we can do,
-			# so just exit.
-			warn "Parent's SCOREBOARD is not tied!";
-			$children = 0;
-		} else {
-			# Get a count of the number of children, and start killing them
-			$mem->shlock( LOCK_SH );
-			# The children haven't already received a signal, so send them one.
-			foreach my $pid ( keys %$scoreboard ) {
-				if ( ($pid ne 'actives') && ($pid ne 'spares') ) {
-					++$children;
-					kill $sig, $pid;
-				}
-			}
-			$mem->shlock( LOCK_UN );
+      $scoreboard = $heap->{'SCOREBOARD'};
+      $mem        = tied %$scoreboard;
+      if ( not defined $mem ) {
 
-			# Check to make sure it is sane.
-			if ( $children < 0 ) {
-				warn "The child count is negative: $children.";
-				$children = 0;
-			}
-		}
-	}
+         # There was an error, but there's nothing we can do,
+         # so just exit.
+         warn "Parent's SCOREBOARD is not tied!";
+         $children = 0;
+      }
+      else {
 
-	# 
-	$_[KERNEL]->delay_set('CheckSpares');
+         # Get a count of the number of children, and start killing them
+         $mem->shlock(LOCK_SH);
 
-	return $children;
+         # The children haven't already received a signal, so send them one.
+         foreach my $pid ( keys %$scoreboard ) {
+            if ( ( $pid ne 'actives' ) && ( $pid ne 'spares' ) ) {
+               ++$children;
+               kill $sig, $pid;
+            }
+         }
+         $mem->shlock(LOCK_UN);
+
+         # Check to make sure it is sane.
+         if ( $children < 0 ) {
+            warn "The child count is negative: $children.";
+            $children = 0;
+         }
+      }
+   }
+
+   #
+   $_[KERNEL]->delay_set('CheckSpares');
+
+   return $children;
 }
 
 # Sets up the SocketFactory wheel :)
 sub SetupListener {
-	# Debug stuff
-	if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-		warn 'Creating SocketFactory wheel now';
-	}
 
-	# Only try to re-establish the listener if we are the parent
-	if ( $_[HEAP]->{'ISCHILD'} ) {
-			warn 'Inside the child. Aborting attempt to reestablish the listener.';
-		return 0;
-	}
+   # Debug stuff
+   if (POE::Component::Server::SimpleHTTP::DEBUG) {
+      warn 'Creating SocketFactory wheel now';
+   }
 
-	# Check if we should set up the wheel
-	if ( $_[HEAP]->{'RETRIES'} == POE::Component::Server::SimpleHTTP::MAX_RETRIES ) {
-		die 'POE::Component::Server::SimpleHTTP::PreFork tried ' . POE::Component::Server::SimpleHTTP::MAX_RETRIES . ' times to create a Wheel and is giving up...';
-	} else {
-		# Increment the retry count if we did not get 'NOINC' as an argument
-		if ( ! defined $_[ARG0] ) {
-			# Increment the retries count
-			$_[HEAP]->{'RETRIES'}++;
-		}
+   # Only try to re-establish the listener if we are the parent
+   if ( $_[HEAP]->{'ISCHILD'} ) {
+      warn 'Inside the child. Aborting attempt to reestablish the listener.';
+      return 0;
+   }
 
-		# Create our own SocketFactory Wheel :)
-		$_[HEAP]->{'SOCKETFACTORY'} = POE::Wheel::SocketFactory->new(
-			'BindPort'	=>	$_[HEAP]->{'PORT'},
-			'BindAddress'	=>	$_[HEAP]->{'ADDRESS'},
-			'Reuse'		=>	'yes',
-			'SuccessEvent'	=>	'Got_Connection',
-			'FailureEvent'	=>	'ListenerError',
-		);
+   # Check if we should set up the wheel
+   if (
+      $_[HEAP]->{'RETRIES'} == POE::Component::Server::SimpleHTTP::MAX_RETRIES )
+   {
+      die 'POE::Component::Server::SimpleHTTP::PreFork tried '
+        . POE::Component::Server::SimpleHTTP::MAX_RETRIES
+        . ' times to create a Wheel and is giving up...';
+   }
+   else {
 
-		# Pre-fork if that is what was requested
-		if ( $_[HEAP]->{'STARTSERVERS'} ) {
-			# We don't want to accept socket connections in the parent process
-			$_[HEAP]->{'SOCKETFACTORY'}->pause_accept();
+      # Increment the retry count if we did not get 'NOINC' as an argument
+      if ( !defined $_[ARG0] ) {
 
-			# Wait a bit and then do the actual forking
-			$_[KERNEL]->yield( 'PreFork', $_[HEAP]->{'SOCKETFACTORY'} );
-		}
-	}
+         # Increment the retries count
+         $_[HEAP]->{'RETRIES'}++;
+      }
 
-	# Success!
-	return 1;
+      # Create our own SocketFactory Wheel :)
+      $_[HEAP]->{'SOCKETFACTORY'} = POE::Wheel::SocketFactory->new(
+         'BindPort'     => $_[HEAP]->{'PORT'},
+         'BindAddress'  => $_[HEAP]->{'ADDRESS'},
+         'Reuse'        => 'yes',
+         'SuccessEvent' => 'Got_Connection',
+         'FailureEvent' => 'ListenerError',
+      );
+
+      # Pre-fork if that is what was requested
+      if ( $_[HEAP]->{'STARTSERVERS'} ) {
+
+         # We don't want to accept socket connections in the parent process
+         $_[HEAP]->{'SOCKETFACTORY'}->pause_accept();
+
+         # Wait a bit and then do the actual forking
+         $_[KERNEL]->yield( 'PreFork', $_[HEAP]->{'SOCKETFACTORY'} );
+      }
+   }
+
+   # Success!
+   return 1;
 }
 
 # PreFork the initial instances.
 sub PreFork {
-	# ARG0 = SocketFactory
-	my ( $kernel, $heap, $sf ) = @_[ KERNEL, HEAP, ARG0 ];
-	my ( $scoreboard, $mem );
 
-	if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-		warn 'Trying to prefork.';
-	}
+   # ARG0 = SocketFactory
+   my ( $kernel, $heap, $sf ) = @_[ KERNEL, HEAP, ARG0 ];
+   my ( $scoreboard, $mem );
 
-	# Only the parent is allowed to fork
-	if ( $heap->{'ISCHILD'} ) {
-		warn "Cannot pre-fork from child $$.";
-		return 0;
-	}
+   if (POE::Component::Server::SimpleHTTP::DEBUG) {
+      warn 'Trying to prefork.';
+   }
 
-	# Make that the current SF is the same as the one we were called for.
-	# If not, then that means and error occured sometime inbetween.
-	if ( (not defined $heap->{'SOCKETFACTORY'}) || ($sf != $heap->{'SOCKETFACTORY'}) ) {
-		warn 'Aborting pre-fork because the SocketFactory is not the same.';
-		return 0;
-	}
+   # Only the parent is allowed to fork
+   if ( $heap->{'ISCHILD'} ) {
+      warn "Cannot pre-fork from child $$.";
+      return 0;
+   }
 
+   # Make that the current SF is the same as the one we were called for.
+   # If not, then that means and error occured sometime inbetween.
+   if (  ( not defined $heap->{'SOCKETFACTORY'} )
+      || ( $sf != $heap->{'SOCKETFACTORY'} ) )
+   {
+      warn 'Aborting pre-fork because the SocketFactory is not the same.';
+      return 0;
+   }
 
-	# Initialize the scoreboard the first time around.
-	if ( not defined $heap->{'SCOREBOARD'} ) {
-		my %temp;
+   # Initialize the scoreboard the first time around.
+   if ( not defined $heap->{'SCOREBOARD'} ) {
+      my %temp;
 
-		# In order to keep a pool of spare children we need to know how many spares there are.
-		$mem = tie %temp, 'IPC::Shareable', 'scbd', { 'create' => 1, 'mode' => 0600 };
-		$scoreboard = \%temp;
-	} else {
-		# We already have a scoreboard from a previous listen attempt.
-		$scoreboard = $heap->{'SCOREBOARD'};
-		$mem = tied %$scoreboard;
-	}
+# In order to keep a pool of spare children we need to know how many spares there are.
+      $mem = tie %temp, 'IPC::Shareable', 'scbd',
+        { 'create' => 1, 'mode' => 0600 };
+      $scoreboard = \%temp;
+   }
+   else {
 
-	if ( not defined $mem ) {
-		warn 'Cannot tie to the shared memory segment. Will try again in 5 seconds.';
-		$kernel->delay_set( 'PreFork', PREFORK_INTERVAL, $sf );
-		return 0;
-	} else {
-		# Clear the variable and store it for later use.
-		%$scoreboard = ( 'spares' => 0, 'actives' => 0 );
-		$heap->{'SCOREBOARD'} = $scoreboard;
-	}
+      # We already have a scoreboard from a previous listen attempt.
+      $scoreboard = $heap->{'SCOREBOARD'};
+      $mem        = tied %$scoreboard;
+   }
 
-	for ( 1 .. $heap->{'STARTSERVERS'} ) {
-		my $pid = fork();
+   if ( not defined $mem ) {
+      warn
+        'Cannot tie to the shared memory segment. Will try again in 5 seconds.';
+      $kernel->delay_set( 'PreFork', PREFORK_INTERVAL, $sf );
+      return 0;
+   }
+   else {
 
-		if ( not defined $pid ) {
-			# Make sure this fork succeeded.
-			warn "Server $$ fork failed: $!";
-			next;
-		} elsif ( $pid ) {
-			# We are the parent.
-			next;
-		} else {
-			if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-				warn "Forked child $$.";
-			}
+      # Clear the variable and store it for later use.
+      %$scoreboard = ( 'spares' => 0, 'actives' => 0 );
+      $heap->{'SCOREBOARD'} = $scoreboard;
+   }
 
-			# We are the child. Do something "childish".
-			$heap->{'ISCHILD'} = 1;
-			$kernel->call( $_[SESSION], 'AddScoreboard' );
+   for ( 1 .. $heap->{'STARTSERVERS'} ) {
+      my $pid = fork();
 
-			# Notify the other forked sessions that we have forked.
-			foreach my $sess ( keys( %{$heap->{'FORKHANDLERS'}} ) ) {
-				$_[KERNEL]->call( $sess, $heap->{'FORKHANDLERS'}->{$sess} );
-			}
+      if ( not defined $pid ) {
 
+         # Make sure this fork succeeded.
+         warn "Server $$ fork failed: $!";
+         next;
+      }
+      elsif ($pid) {
 
-			# Get to work!
-			$sf->resume_accept();
-			return 1;
-		}
-	}
+         # We are the parent.
+         next;
+      }
+      else {
+         if (POE::Component::Server::SimpleHTTP::DEBUG) {
+            warn "Forked child $$.";
+         }
 
-	# Pre-forking is done and our children are happily away!
-	# We are the parent, so start monitoring the spare pool.
-	$kernel->delay_set( 'CheckSpares', CHECKSPARES_INTERVAL );
+         # We are the child. Do something "childish".
+         $heap->{'ISCHILD'} = 1;
+         $kernel->call( $_[SESSION], 'AddScoreboard' );
 
-	# Let the developer see the scoreboard if they want.
-	if ( DEBUGSB ) {
-		$kernel->delay_set( 'ShowScoreboard', 1 );
-	}
+         # Notify the other forked sessions that we have forked.
+         foreach my $sess ( keys( %{ $heap->{'FORKHANDLERS'} } ) ) {
+            $_[KERNEL]->call( $sess, $heap->{'FORKHANDLERS'}->{$sess} );
+         }
+
+         # Get to work!
+         $sf->resume_accept();
+         return 1;
+      }
+   }
+
+   # Pre-forking is done and our children are happily away!
+   # We are the parent, so start monitoring the spare pool.
+   $kernel->delay_set( 'CheckSpares', CHECKSPARES_INTERVAL );
+
+   # Let the developer see the scoreboard if they want.
+   if (DEBUGSB) {
+      $kernel->delay_set( 'ShowScoreboard', 1 );
+   }
 }
 
 # True if this is a child.
 sub IsChild {
-	return $_[HEAP]->{'ISCHILD'};
+   return $_[HEAP]->{'ISCHILD'};
 }
 
 # Check to see if we need a new spare.
 sub CheckSpares {
-	my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
-	my ( $scoreboard, $mem );
+   my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
+   my ( $scoreboard, $mem );
 
-	# Make sure that we are not a child.
-	if ( $heap->{'ISCHILD'} ) {
-		warn "Child $$ trying to check the spares!";
-		return 0;
-	}
+   # Make sure that we are not a child.
+   if ( $heap->{'ISCHILD'} ) {
+      warn "Child $$ trying to check the spares!";
+      return 0;
+   }
 
-	# Make sure there is still a socket factory. If not, then this server
-	# is shutting down.
-	if ( not defined $heap->{'SOCKETFACTORY'} ) {
-		if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-			warn 'Ending CheckSpares on the parent.';
-		}
-		return 1;
-	}
+   # Make sure there is still a socket factory. If not, then this server
+   # is shutting down.
+   if ( not defined $heap->{'SOCKETFACTORY'} ) {
+      if (POE::Component::Server::SimpleHTTP::DEBUG) {
+         warn 'Ending CheckSpares on the parent.';
+      }
+      return 1;
+   }
 
+   # Retrieve the shared memory variable.
+   $scoreboard = $heap->{'SCOREBOARD'};
 
-	# Retrieve the shared memory variable.
-	$scoreboard = $heap->{'SCOREBOARD'};
+   # in the test for maxrequestperchild the only
+   # way to have CheckSpare aware that we're shutting down
+   # is using this shared variable
+   if ( defined $scoreboard->{'shutdown'} ) {
+      if (POE::Component::Server::SimpleHTTP::DEBUG) {
+         warn 'Shutdown in progress, checkspare is useless';
+      }
+      return 1;
+   }
 
-    # in the test for maxrequestperchild the only 
-    # way to have CheckSpare aware that we're shutting down
-    # is using this shared variable
-    if (defined $scoreboard->{'shutdown'}) {
-        if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-            warn 'Shutdown in progress, checkspare is useless';
-        }
-        return 1;
-    }
+   $mem = tied %$scoreboard if defined $scoreboard;
+   if ( not defined $mem ) {
+      warn 'SCOREBOARD is not tied! Aborting.';
+      return 0;
+   }
 
-	$mem = tied %$scoreboard if defined $scoreboard;
-	if ( not defined $mem ) {
-		warn 'SCOREBOARD is not tied! Aborting.';
-		return 0;
-	}
+   # Check to see if we need another spare, and if so make sure we don't
+   # already have more than enough clients.
+   $mem->shlock(LOCK_SH);
+   if (  ( $scoreboard->{'spares'} < $heap->{'MINSPARESERVERS'} )
+      && ( ( keys(%$scoreboard) - 2 ) < $heap->{'MAXCLIENTS'} ) )
+   {
+      $mem->shlock(LOCK_UN);
+      my $pid = fork();
 
-	# Check to see if we need another spare, and if so make sure we don't
-	# already have more than enough clients.
-	$mem->shlock( LOCK_SH );
-	if ( ($scoreboard->{'spares'} < $heap->{'MINSPARESERVERS'}) &&
-	     ((keys( %$scoreboard ) - 2) < $heap->{'MAXCLIENTS'}) ) {
-	     	$mem->shlock( LOCK_UN );
-		my $pid = fork();
+      if ( not defined $pid ) {
+         warn 'fork failed while creating a new spare.';
+      }
+      elsif ($pid) {
 
-		if ( not defined $pid ) {
-			warn 'fork failed while creating a new spare.';
-		} elsif ( $pid ) {
-			# We are the parent.
-		} else {
-			if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-				warn "Created spare child $$.";
-			}
+         # We are the parent.
+      }
+      else {
+         if (POE::Component::Server::SimpleHTTP::DEBUG) {
+            warn "Created spare child $$.";
+         }
 
-			# We are the child. Do something "childish".
-			$heap->{'ISCHILD'} = 1;
-			$kernel->call( $_[SESSION], 'AddScoreboard' );
+         # We are the child. Do something "childish".
+         $heap->{'ISCHILD'} = 1;
+         $kernel->call( $_[SESSION], 'AddScoreboard' );
 
-			# Notify the other forked sessions that we have forked.
-			foreach my $sess ( keys( %{$heap->{'FORKHANDLERS'}} ) ) {
-				$_[KERNEL]->call( $sess, $heap->{'FORKHANDLERS'}->{$sess} );
-			}
+         # Notify the other forked sessions that we have forked.
+         foreach my $sess ( keys( %{ $heap->{'FORKHANDLERS'} } ) ) {
+            $_[KERNEL]->call( $sess, $heap->{'FORKHANDLERS'}->{$sess} );
+         }
 
-			# Start accepting connections!
-			$heap->{'SOCKETFACTORY'}->resume_accept();
-		}
-	} else {
-		# No new spares were needed.
-		$mem->shlock( LOCK_UN );
-	}
+         # Start accepting connections!
+         $heap->{'SOCKETFACTORY'}->resume_accept();
+      }
+   }
+   else {
 
-	# If we are the parent, then reschedule another spare check.
-	if ( $heap->{'ISCHILD'} == 0 ) {
-		$kernel->delay_set( 'CheckSpares', CHECKSPARES_INTERVAL );
-	}
+      # No new spares were needed.
+      $mem->shlock(LOCK_UN);
+   }
+
+   # If we are the parent, then reschedule another spare check.
+   if ( $heap->{'ISCHILD'} == 0 ) {
+      $kernel->delay_set( 'CheckSpares', CHECKSPARES_INTERVAL );
+   }
 }
 
 # Debug routine so that we can watch what is happening on the scoreboard.
 sub ShowScoreboard {
-	my ( $heap ) = $_[ HEAP ];
-	my ( $scoreboard, $mem, $hcount, $pid );
+   my ($heap) = $_[HEAP];
+   my ( $scoreboard, $mem, $hcount, $pid );
 
-	# Check to make sure we are not a child.
-	if ( $heap->{'ISCHILD'} ) {
-		return 0;
-	}
+   # Check to make sure we are not a child.
+   if ( $heap->{'ISCHILD'} ) {
+      return 0;
+   }
 
-	# Check to make sure the scoreboard is still up.
-	$scoreboard = $heap->{'SCOREBOARD'};
-	if ( not defined $scoreboard ) {
-		return 0;
-	}
+   # Check to make sure the scoreboard is still up.
+   $scoreboard = $heap->{'SCOREBOARD'};
+   if ( not defined $scoreboard ) {
+      return 0;
+   }
 
-	# Retrieve the underlying class.
-	$mem = tied %$scoreboard;
-	if ( not defined $mem ) {
-		warn 'SCOREBOARD is not tied! Aborting.';
-		return 0;
-	}
+   # Retrieve the underlying class.
+   $mem = tied %$scoreboard;
+   if ( not defined $mem ) {
+      warn 'SCOREBOARD is not tied! Aborting.';
+      return 0;
+   }
 
-	# Lock the scoreboard and print out the entries.
-	$mem->shlock( LOCK_SH );
-	$hcount = 0;
-	print STDERR "[$$] actives = ", $scoreboard->{'actives'}, "\tspares = ", $scoreboard->{'spares'}, "\n";
-	foreach $pid ( keys %$scoreboard ) {
-		next if ($pid eq 'actives') || ($pid eq 'spares');
+   # Lock the scoreboard and print out the entries.
+   $mem->shlock(LOCK_SH);
+   $hcount = 0;
+   print STDERR "[$$] actives = ", $scoreboard->{'actives'}, "\tspares = ",
+     $scoreboard->{'spares'}, "\n";
+   foreach $pid ( keys %$scoreboard ) {
+      next if ( $pid eq 'actives' ) || ( $pid eq 'spares' );
 
-		print STDERR $pid, " = ", $scoreboard->{$pid};
-		if ( ++$hcount % 5 == 0 ) {
-			print STDERR "\n";
-		} else {
-			print STDERR "\t";
-		}
-	}
-	print STDERR "\n\n";
-	$mem->shlock( LOCK_UN );
+      print STDERR $pid, " = ", $scoreboard->{$pid};
+      if ( ++$hcount % 5 == 0 ) {
+         print STDERR "\n";
+      }
+      else {
+         print STDERR "\t";
+      }
+   }
+   print STDERR "\n\n";
+   $mem->shlock(LOCK_UN);
 
-	# If the socketfactory still exists then we should continue looping.
-	if ( exists $heap->{'SOCKETFACTORY'} ) {
-		$_[KERNEL]->delay_set( 'ShowScoreboard', 1 );
-	}
+   # If the socketfactory still exists then we should continue looping.
+   if ( exists $heap->{'SOCKETFACTORY'} ) {
+      $_[KERNEL]->delay_set( 'ShowScoreboard', 1 );
+   }
 }
 
 # A child died :(
 sub SigCHLD {
-	my ( $heap, $pid ) = @_[ HEAP, ARG1 ];
-	my ( $scoreboard, $mem, $children );
+   my ( $heap, $pid ) = @_[ HEAP, ARG1 ];
+   my ( $scoreboard, $mem, $children );
 
-	# Check to see if we are in preforked mode and the parent.
-	if ( $heap->{'ISCHILD'} == 0 ) {
-		# Retrieve our scoreboard.
-		$scoreboard = $heap->{'SCOREBOARD'};
-		$mem = tied %$scoreboard if defined $scoreboard;
-		if ( not defined $mem ) {
-			warn 'Cannot get the IPC::Shareable object for the SCOREBOARD!';
-			return;
-		}
+   # Check to see if we are in preforked mode and the parent.
+   if ( $heap->{'ISCHILD'} == 0 ) {
 
-		$mem->shlock( LOCK_EX );
-		# Cleanup children here (they should never do it themselves).
-			if ( exists $scoreboard->{$pid} ) {
-				if ( $scoreboard->{$pid} eq 'S' ) {
-					--$scoreboard->{'spares'};
-				} elsif ( $scoreboard->{$pid} eq 'A' ) {
-					--$scoreboard->{'actives'};
-				}
-				delete $scoreboard->{$pid};
-			}
+      # Retrieve our scoreboard.
+      $scoreboard = $heap->{'SCOREBOARD'};
+      $mem = tied %$scoreboard if defined $scoreboard;
+      if ( not defined $mem ) {
+         warn 'Cannot get the IPC::Shareable object for the SCOREBOARD!';
+         return;
+      }
 
-		# Get the number of children.
-		$children = keys( %$scoreboard ) - 2;
+      $mem->shlock(LOCK_EX);
 
-		$mem->shlock( LOCK_UN );
+      # Cleanup children here (they should never do it themselves).
+      if ( exists $scoreboard->{$pid} ) {
+         if ( $scoreboard->{$pid} eq 'S' ) {
+            --$scoreboard->{'spares'};
+         }
+         elsif ( $scoreboard->{$pid} eq 'A' ) {
+            --$scoreboard->{'actives'};
+         }
+         delete $scoreboard->{$pid};
+      }
 
-		# If the children are dying and the SOCKETFACTORY no longer exists, then
-		# we are probably in a graceful shutdown.
-		if ( ($children <= 0) && (not exists $heap->{'SOCKETFACTORY'}) ) {
-			$_[KERNEL]->yield( 'SHUTDOWN', 'GRACEFUL' );
-		}
-	}
+      # Get the number of children.
+      $children = keys(%$scoreboard) - 2;
+
+      $mem->shlock(LOCK_UN);
+
+      # If the children are dying and the SOCKETFACTORY no longer exists, then
+      # we are probably in a graceful shutdown.
+      if ( ( $children <= 0 ) && ( not exists $heap->{'SOCKETFACTORY'} ) ) {
+         $_[KERNEL]->yield( 'SHUTDOWN', 'GRACEFUL' );
+      }
+   }
 }
 
 # Someone is asking us to quit...
 sub SigTERM {
-	my ( $sig ) = $_[ ARG0 ];
+   my ($sig) = $_[ARG0];
 
-	if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-		warn "Caught signal ", $sig, " inside $$. Initiating graceful shutdown.";
-	}
+   if (POE::Component::Server::SimpleHTTP::DEBUG) {
+      warn "Caught signal ", $sig, " inside $$. Initiating graceful shutdown.";
+   }
 
-	# Shutdown gracefully, and tell POE we handled the signal.
-	$_[KERNEL]->yield( 'SHUTDOWN', 'GRACEFUL' );
-	$_[KERNEL]->sig_handled();
+   # Shutdown gracefully, and tell POE we handled the signal.
+   $_[KERNEL]->yield( 'SHUTDOWN', 'GRACEFUL' );
+   $_[KERNEL]->sig_handled();
 }
 
 # Add the scoreboard entry for this child.
 sub AddScoreboard {
-	my ( $heap ) = $_[ HEAP ];
-	my ( $scoreboard, $mem );
+   my ($heap) = $_[HEAP];
+   my ( $scoreboard, $mem );
 
-	# Check to see if we are preforked.
-	if ( $heap->{'ISCHILD'} ) {
-		$scoreboard = $heap->{'SCOREBOARD'};
-		$mem = tied %$scoreboard if defined $scoreboard;
-		if ( not defined $mem ) {
-			# Don't do anyting if we can't lock stuff.
-			warn "SCOREBOARD is not tied to IPC::Shareable in child $$!";
-		} else {
-			# Lock the scoreboard and record ourself properly.
-			$mem->shlock( LOCK_EX );
-			if ( not exists $scoreboard->{$$} ) {
-				$scoreboard->{$$} = 'S';
-				++$scoreboard->{'spares'};
-			}
-			$mem->shlock( LOCK_UN );
-		}
-	}
+   # Check to see if we are preforked.
+   if ( $heap->{'ISCHILD'} ) {
+      $scoreboard = $heap->{'SCOREBOARD'};
+      $mem = tied %$scoreboard if defined $scoreboard;
+      if ( not defined $mem ) {
 
-	return 1;
+         # Don't do anyting if we can't lock stuff.
+         warn "SCOREBOARD is not tied to IPC::Shareable in child $$!";
+      }
+      else {
+
+         # Lock the scoreboard and record ourself properly.
+         $mem->shlock(LOCK_EX);
+         if ( not exists $scoreboard->{$$} ) {
+            $scoreboard->{$$} = 'S';
+            ++$scoreboard->{'spares'};
+         }
+         $mem->shlock(LOCK_UN);
+      }
+   }
+
+   return 1;
 }
 
 # Set the scoreboard entry for this child.
 sub UpdateScoreboard {
-	my ( $heap ) = $_[ HEAP ];
-	my ( $scoreboard, $mem );
+   my ($heap) = $_[HEAP];
+   my ( $scoreboard, $mem );
 
-	# Check to see if we are preforked.
-	if ( $heap->{'ISCHILD'} ) {
-		$scoreboard = $heap->{'SCOREBOARD'};
-		$mem = tied %$scoreboard if defined $scoreboard;
-		if ( not defined $mem ) {
-			# Don't do anyting if we can't lock stuff.
-			warn "SCOREBOARD is not tied to IPC::Shareable in child $$!";
-		} else {
-			# Lock the scoreboard and record ourself properly.
-			$mem->shlock( LOCK_EX );
-			if ( (keys( %{$heap->{'REQUESTS'}} ) == 0) && ($scoreboard->{$$} eq 'A') ) {
-				$scoreboard->{$$} = 'S';
-				++$scoreboard->{'spares'};
-				--$scoreboard->{'actives'};
+   # Check to see if we are preforked.
+   if ( $heap->{'ISCHILD'} ) {
+      $scoreboard = $heap->{'SCOREBOARD'};
+      $mem = tied %$scoreboard if defined $scoreboard;
+      if ( not defined $mem ) {
 
-				# If we have too many spares then ask this one to shutdown.
-				if ( $scoreboard->{'spares'} > $heap->{'MAXSPARESERVERS'} ) {
-					if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-						warn "Shutting down $$ because of too many spares.";
-					}
+         # Don't do anyting if we can't lock stuff.
+         warn "SCOREBOARD is not tied to IPC::Shareable in child $$!";
+      }
+      else {
 
-					$_[KERNEL]->yield( 'SHUTDOWN', 'GRACEFUL' );
-				}
-			} elsif ( (keys( %{$heap->{'REQUESTS'}} ) != 0) && ($scoreboard->{$$} eq 'S') ) {
-				$scoreboard->{$$} = 'A';
-				--$scoreboard->{'spares'};
-				++$scoreboard->{'actives'};
-			}
-			$mem->shlock( LOCK_UN );
-		}
-	}
+         # Lock the scoreboard and record ourself properly.
+         $mem->shlock(LOCK_EX);
+         if (  ( keys( %{ $heap->{'REQUESTS'} } ) == 0 )
+            && ( $scoreboard->{$$} eq 'A' ) )
+         {
+            $scoreboard->{$$} = 'S';
+            ++$scoreboard->{'spares'};
+            --$scoreboard->{'actives'};
 
-	return 1;
+            # If we have too many spares then ask this one to shutdown.
+            if ( $scoreboard->{'spares'} > $heap->{'MAXSPARESERVERS'} ) {
+               if (POE::Component::Server::SimpleHTTP::DEBUG) {
+                  warn "Shutting down $$ because of too many spares.";
+               }
+
+               $_[KERNEL]->yield( 'SHUTDOWN', 'GRACEFUL' );
+            }
+         }
+         elsif ( ( keys( %{ $heap->{'REQUESTS'} } ) != 0 )
+            && ( $scoreboard->{$$} eq 'S' ) )
+         {
+            $scoreboard->{$$} = 'A';
+            --$scoreboard->{'spares'};
+            ++$scoreboard->{'actives'};
+         }
+         $mem->shlock(LOCK_UN);
+      }
+   }
+
+   return 1;
 }
 
 # Stops listening on the socket
 sub StopListen {
-	if ( $_[HEAP]->{'ISCHILD'} ) {
-		# If we are the child then we shouldn't really stop listening.
-		# Instead, pause accepting on our SocketFactory.
-		if ( (not exists $_[HEAP]->{'SOCKETFACTORY'}) || (not defined $_[HEAP]->{'SOCKETFACTORY'} ) ) {
-			warn "Cannot StopListen on a non-existant SOCKETFACTORY in child $$";
-			return 0;
-		} else {
-			# Pause accepting.
-			$_[HEAP]->{'SOCKETFACTORY'}->pause_accept();
-			return 1;
-		}
-	} else {
-		# We are in the parent, so truly stop listening.
-		# Kill the children because they are still listenning.
-		$_[KERNEL]->call( $_[SESSION], 'KillChildren', 'TERM' );
+   if ( $_[HEAP]->{'ISCHILD'} ) {
 
-		# Call the super class method.
-		return POE::Component::Server::SimpleHTTP::StopListen( @_ );
-	}
+      # If we are the child then we shouldn't really stop listening.
+      # Instead, pause accepting on our SocketFactory.
+      if (  ( not exists $_[HEAP]->{'SOCKETFACTORY'} )
+         || ( not defined $_[HEAP]->{'SOCKETFACTORY'} ) )
+      {
+         warn "Cannot StopListen on a non-existant SOCKETFACTORY in child $$";
+         return 0;
+      }
+      else {
+
+         # Pause accepting.
+         $_[HEAP]->{'SOCKETFACTORY'}->pause_accept();
+         return 1;
+      }
+   }
+   else {
+
+      # We are in the parent, so truly stop listening.
+      # Kill the children because they are still listenning.
+      $_[KERNEL]->call( $_[SESSION], 'KillChildren', 'TERM' );
+
+      # Call the super class method.
+      return POE::Component::Server::SimpleHTTP::StopListen(@_);
+   }
 }
 
 sub StartListen {
-	if ( $_[HEAP]->{'ISCHILD'} ) {
-		# If we are the child then we can't really create a new SOCKETFACTORY.
-		# Instead, we can resume accepting on our current SOCKETFACTORY.
-		if ( (not exists $_[HEAP]->{'SOCKETFACTORY'}) || (not defined $_[HEAP]->{'SOCKETFACTORY'} ) ) {
-			warn "Cannot StartListen on a non-existant SOCKETFACTORY in child $$";
-			return 0;
-		} else {
-			# Resume accepting.
-			$_[HEAP]->{'SOCKETFACTORY'}->resume_accept();
-			return 1;
-		}
-	} else {
-		# We are the parent. Truly start listening again.
-		return POE::Component::Server::SimpleHTTP::StartListen( @_ );
-	}
+   if ( $_[HEAP]->{'ISCHILD'} ) {
+
+      # If we are the child then we can't really create a new SOCKETFACTORY.
+      # Instead, we can resume accepting on our current SOCKETFACTORY.
+      if (  ( not exists $_[HEAP]->{'SOCKETFACTORY'} )
+         || ( not defined $_[HEAP]->{'SOCKETFACTORY'} ) )
+      {
+         warn "Cannot StartListen on a non-existant SOCKETFACTORY in child $$";
+         return 0;
+      }
+      else {
+
+         # Resume accepting.
+         $_[HEAP]->{'SOCKETFACTORY'}->resume_accept();
+         return 1;
+      }
+   }
+   else {
+
+      # We are the parent. Truly start listening again.
+      return POE::Component::Server::SimpleHTTP::StartListen(@_);
+   }
 }
 
 # Sets the HANDLERS
 sub SetHandlers {
-	# Setting handlers in a child makes little sense, so abort if this is the case
-	if ( $_[HEAP]->{'ISCHILD'} ) {
-		warn "Child $$ tried to set the handlers for SimpleHTTP.";
-		return 0;
-	}
 
-	# Call the super class method.
-	return POE::Component::Server::SimpleHTTP::SetHandlers( @_ );
+  # Setting handlers in a child makes little sense, so abort if this is the case
+   if ( $_[HEAP]->{'ISCHILD'} ) {
+      warn "Child $$ tried to set the handlers for SimpleHTTP.";
+      return 0;
+   }
+
+   # Call the super class method.
+   return POE::Component::Server::SimpleHTTP::SetHandlers(@_);
 }
 
 # Sets the FORKHANDLERS
 sub SetForkHandlers {
-	# ARG0 = ref to handlers hash
-	my $handlers = $_[ARG0];
 
-	# Setting handlers in a child makes little sense, so abort if this is the case.
-	if ( $_[HEAP]->{'ISCHILD'} ) {
-		warn "Child $$ tried to set the handlers for SimpleHTTP.";
-		return 0;
-	}
+   # ARG0 = ref to handlers hash
+   my $handlers = $_[ARG0];
 
-	# Validate it...
-	if ( (not defined $handlers) || (ref( $handlers ) ne 'HASH') ) {
-		warn "FORKHANDLERS is not in the proper format.";
-		return 0;
-	}
+ # Setting handlers in a child makes little sense, so abort if this is the case.
+   if ( $_[HEAP]->{'ISCHILD'} ) {
+      warn "Child $$ tried to set the handlers for SimpleHTTP.";
+      return 0;
+   }
 
-	# If we got here, passed tests!
-	$_[HEAP]->{'FORKHANDLERS'} = $handlers;
+   # Validate it...
+   if ( ( not defined $handlers ) || ( ref($handlers) ne 'HASH' ) ) {
+      warn "FORKHANDLERS is not in the proper format.";
+      return 0;
+   }
 
-	# All done!
-	return 1;
+   # If we got here, passed tests!
+   $_[HEAP]->{'FORKHANDLERS'} = $handlers;
+
+   # All done!
+   return 1;
 }
 
 # Gets the FORKHANDLERS
 sub GetForkHandlers {
-	# ARG0 = session, ARG1 = event
-	my( $session, $event ) = @_[ ARG0, ARG1 ];
 
-	# Validation
-	if ( ! defined $session or ! defined $event ) {
-		return undef;
-	}
+   # ARG0 = session, ARG1 = event
+   my ( $session, $event ) = @_[ ARG0, ARG1 ];
 
-	# Make a deep copy of the handlers
-	require Storable;
+   # Validation
+   if ( !defined $session or !defined $event ) {
+      return undef;
+   }
 
-	my $handlers = Storable::dclone( $_[HEAP]->{'FORKHANDLERS'} );
+   # Make a deep copy of the handlers
+   require Storable;
 
-	# All done!
-	$_[KERNEL]->post( $session, $event, $handlers );
+   my $handlers = Storable::dclone( $_[HEAP]->{'FORKHANDLERS'} );
 
-	# All done!
-	return 1;
+   # All done!
+   $_[KERNEL]->post( $session, $event, $handlers );
+
+   # All done!
+   return 1;
 }
 
 # The actual manager of connections
 sub Got_Connection {
-	# ARG0 = Socket, ARG1 = Remote Address, ARG2 = Remote Port
-	my ( $socket ) = $_[ ARG0 ];
 
-	# Should we SSLify it?
-	if ( defined $_[HEAP]->{'SSLKEYCERT'} ) {
-		# SSLify it!
-		eval { $socket = Server_SSLify( $socket ) };
-		if ( $@ ) {
-			warn "Unable to turn on SSL for connection from " . Socket::inet_ntoa( $_[ARG1] ) . " -> $@";
-			close $socket;
-			return 1;
-		}
-	}
+   # ARG0 = Socket, ARG1 = Remote Address, ARG2 = Remote Port
+   my ($socket) = $_[ARG0];
 
-	# Set up the Wheel to read from the socket
-	my $wheel = POE::Wheel::ReadWrite->new(
-		'Handle'	=>	$socket,
-		'Driver'	=>	POE::Driver::SysRW->new(),
-		'Filter'	=>	POE::Filter::HTTPD->new(),
-		'InputEvent'	=>	'Got_Input',
-		'FlushedEvent'	=>	'Got_Flush',
-		'ErrorEvent'	=>	'Got_Error',
-	);
+   # Should we SSLify it?
+   if ( defined $_[HEAP]->{'SSLKEYCERT'} ) {
 
-	# Save this wheel!
-	# 0 = wheel, 1 = Output done?, 2 = SimpleHTTP::Response object
-	$_[HEAP]->{'REQUESTS'}->{ $wheel->ID } = [ $wheel, 0, undef ];
+      # SSLify it!
+      eval { $socket = Server_SSLify($socket) };
+      if ($@) {
+         warn "Unable to turn on SSL for connection from "
+           . Socket::inet_ntoa( $_[ARG1] )
+           . " -> $@";
+         close $socket;
+         return 1;
+      }
+   }
 
-	# Update the scoreboard.
-	$_[KERNEL]->call( $_[SESSION], 'UpdateScoreboard' );
+   # Set up the Wheel to read from the socket
+   my $wheel = POE::Wheel::ReadWrite->new(
+      'Handle'       => $socket,
+      'Driver'       => POE::Driver::SysRW->new(),
+      'Filter'       => POE::Filter::HTTPD->new(),
+      'InputEvent'   => 'Got_Input',
+      'FlushedEvent' => 'Got_Flush',
+      'ErrorEvent'   => 'Got_Error',
+   );
 
-	# Debug stuff
-	if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-		warn "Got_Connection completed creation of ReadWrite wheel ( " . $wheel->ID . " )";
-	}
+   # Save this wheel!
+   # 0 = wheel, 1 = Output done?, 2 = SimpleHTTP::Response object
+   $_[HEAP]->{'REQUESTS'}->{ $wheel->ID } = [ $wheel, 0, undef ];
 
-	# Success!
-	return 1;
+   # Update the scoreboard.
+   $_[KERNEL]->call( $_[SESSION], 'UpdateScoreboard' );
+
+   # Debug stuff
+   if (POE::Component::Server::SimpleHTTP::DEBUG) {
+      warn "Got_Connection completed creation of ReadWrite wheel ( "
+        . $wheel->ID . " )";
+   }
+
+   # Success!
+   return 1;
 }
 
 # Finally got input, set some stuff and send away!
 sub Got_Input {
-	# ARG0 = HTTP::Request object, ARG1 = Wheel ID
-	my ( $request, $id ) = @_[ ARG0, ARG1 ];
 
-	# Call the super class method.
-	my $rv = POE::Component::Server::SimpleHTTP::Got_Input( @_ );
+   # ARG0 = HTTP::Request object, ARG1 = Wheel ID
+   my ( $request, $id ) = @_[ ARG0, ARG1 ];
 
-	# If the connection died/failed for some reason then the request is deleted.
-	# In this case, we have to update the scoreboard.
-	if ( not exists $_[HEAP]->{'REQUESTS'}->{ $id } ) {
-		$_[KERNEL]->call( $_[SESSION], 'UpdateScoreboard' );
-	}
+   # Call the super class method.
+   my $rv = POE::Component::Server::SimpleHTTP::Got_Input(@_);
 
-	return $rv;
+   # If the connection died/failed for some reason then the request is deleted.
+   # In this case, we have to update the scoreboard.
+   if ( not exists $_[HEAP]->{'REQUESTS'}->{$id} ) {
+      $_[KERNEL]->call( $_[SESSION], 'UpdateScoreboard' );
+   }
+
+   return $rv;
 }
 
 # Finished with a request!
 sub Got_Flush {
-	# ARG0 = wheel ID
-	my ( $id ) = $_[ ARG0 ];
 
-	# Call the super class method.
-	my $rv = POE::Component::Server::SimpleHTTP::Got_Flush( @_ );
+   # ARG0 = wheel ID
+   my ($id) = $_[ARG0];
 
-	# Deal with maxrequestperchild
-	if ( $_[HEAP]->{'ISCHILD'} && defined $_[HEAP]->{'MAXREQUESTPERCHILD'}) {
-                $_[HEAP]->{'REQUESTCOUNT'}++;
-                
-                if ($_[HEAP]->{'REQUESTCOUNT'} >= $_[HEAP]->{'MAXREQUESTPERCHILD'}) {
-                  
-                  if ( POE::Component::Server::SimpleHTTP::DEBUG ) {
-                          warn "Shutting down $$ because it reached MAXREQUESTPERCHILD.";
-                  }
-                  
-                  $_[KERNEL]->yield( 'SHUTDOWN', 'GRACEFUL' );
-                  return 1;
-               }
-	}
-        
-	# If the connection died/failed for some reason then the request is deleted.
-	# In this case, we have to update the scoreboard.
-	if ( not exists $_[HEAP]->{'REQUESTS'}->{ $id } ) {
-		$_[KERNEL]->call( $_[SESSION], 'UpdateScoreboard' );
-	}
+   # Call the super class method.
+   my $rv = POE::Component::Server::SimpleHTTP::Got_Flush(@_);
 
-	return $rv;
+   # Deal with maxrequestperchild
+   if ( $_[HEAP]->{'ISCHILD'} && defined $_[HEAP]->{'MAXREQUESTPERCHILD'} ) {
+      $_[HEAP]->{'REQUESTCOUNT'}++;
+
+      if ( $_[HEAP]->{'REQUESTCOUNT'} >= $_[HEAP]->{'MAXREQUESTPERCHILD'} ) {
+
+         if (POE::Component::Server::SimpleHTTP::DEBUG) {
+            warn "Shutting down $$ because it reached MAXREQUESTPERCHILD.";
+         }
+
+         $_[KERNEL]->yield( 'SHUTDOWN', 'GRACEFUL' );
+         return 1;
+      }
+   }
+
+   # If the connection died/failed for some reason then the request is deleted.
+   # In this case, we have to update the scoreboard.
+   if ( not exists $_[HEAP]->{'REQUESTS'}->{$id} ) {
+      $_[KERNEL]->call( $_[SESSION], 'UpdateScoreboard' );
+   }
+
+   return $rv;
 }
 
 # Got some sort of error from ReadWrite
 sub Got_Error {
-	# Call the super class method.
-	my $rv = POE::Component::Server::SimpleHTTP::Got_Error( @_ );
 
-	# The connection was probably cleared, so update the scoreboard.
-	$_[KERNEL]->call( $_[SESSION], 'UpdateScoreboard' );
+   # Call the super class method.
+   my $rv = POE::Component::Server::SimpleHTTP::Got_Error(@_);
 
-	return $rv;
+   # The connection was probably cleared, so update the scoreboard.
+   $_[KERNEL]->call( $_[SESSION], 'UpdateScoreboard' );
+
+   return $rv;
 }
 
 # Closes the connection
 sub Request_Close {
-	# Call the super class method.
-	my $rv = POE::Component::Server::SimpleHTTP::Request_Close( @_ );
 
-	# The connection was probably cleared, so update the scoreboard.
-		$_[KERNEL]->call( $_[SESSION], 'UpdateScoreboard' );
+   # Call the super class method.
+   my $rv = POE::Component::Server::SimpleHTTP::Request_Close(@_);
 
-	return $rv;
+   # The connection was probably cleared, so update the scoreboard.
+   $_[KERNEL]->call( $_[SESSION], 'UpdateScoreboard' );
+
+   return $rv;
 }
 
 # End of module
 1;
 
 __END__
+
 =head1 NAME
 
 POE::Component::Server::SimpleHTTP::PreFork - PreForking support for SimpleHTTP

@@ -2,8 +2,8 @@
 package POE::Component::Server::SimpleHTTP::Response;
 
 # Standard stuff to catch errors
-use strict qw(subs vars refs);				# Make sure we can't mess up
-use warnings;				# Enable warnings to catch errors
+use strict qw(subs vars refs);    # Make sure we can't mess up
+use warnings;                     # Enable warnings to catch errors
 
 # Initialize our version
 # $Revision: 1181 $
@@ -14,44 +14,45 @@ use base qw( HTTP::Response );
 
 # Creates a new instance!
 sub new {
-	# Remove the tempclass
-	my $tempclass = shift;
 
-	# Get the Wheel ID
-	my $wid = shift;
+   # Remove the tempclass
+   my $tempclass = shift;
 
-	# Get the Connection object
-	my $conn = shift;
+   # Get the Wheel ID
+   my $wid = shift;
 
-	# Make sure we got the wheel ID!
-	if ( ! defined $wid ) {
-		die 'Did not get a Wheel ID!';
-	}
+   # Get the Connection object
+   my $conn = shift;
 
-	# Create the instance!
-	my $self = HTTP::Response->new();
+   # Make sure we got the wheel ID!
+   if ( !defined $wid ) {
+      die 'Did not get a Wheel ID!';
+   }
 
-	# Add the Wheel ID
-	$self->{'WHEEL_ID'} = $wid;
+   # Create the instance!
+   my $self = HTTP::Response->new();
 
-	# Add the connection object
-	$self->{'CONNECTION'} = $conn;
+   # Add the Wheel ID
+   $self->{'WHEEL_ID'} = $wid;
 
-	# Bless it to ourself!
-	bless( $self, 'POE::Component::Server::SimpleHTTP::Response' );
+   # Add the connection object
+   $self->{'CONNECTION'} = $conn;
 
-	# All done!
-	return $self;
+   # Bless it to ourself!
+   bless( $self, 'POE::Component::Server::SimpleHTTP::Response' );
+
+   # All done!
+   return $self;
 }
 
 # Gets the Wheel ID
 sub _WHEEL {
-	return shift->{'WHEEL_ID'};
+   return shift->{'WHEEL_ID'};
 }
 
 # Gets the connection object
 sub connection {
-	return shift->{'CONNECTION'};
+   return shift->{'CONNECTION'};
 }
 
 sub stream {
@@ -60,10 +61,10 @@ sub stream {
 
    no strict 'refs';
 
-   if ($opt{event} ne '') {
-      $self->{'STREAM_SESSION'}     = $opt{'session'} || undef;
-      $self->{'STREAM'}             = $opt{'event'};
-      $self->{'DONT_FLUSH'}         = $opt{'dont_flush'};
+   if ( $opt{event} ne '' ) {
+      $self->{'STREAM_SESSION'} = $opt{'session'} || undef;
+      $self->{'STREAM'}         = $opt{'event'};
+      $self->{'DONT_FLUSH'}     = $opt{'dont_flush'};
    }
    else {
       $self->{'STREAM'} = shift;
@@ -74,6 +75,7 @@ sub stream {
 1;
 
 __END__
+
 =head1 NAME
 
 POE::Component::Server::SimpleHTTP::Response - Emulates a HTTP::Response object, used for SimpleHTTP
