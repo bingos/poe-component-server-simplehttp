@@ -1,3 +1,17 @@
+========================
+2009-01-23 07:27:00 1.54
+========================
+
+  2009-01-23 07:23:17 (r138) by bingos
+  lib/POE/Component/Server/SimpleHTTP/PreFork.pm M; t/05_post.t M;
+  t/04_run_close.t M; t/04_run_keepalive.t M;
+  lib/POE/Component/Server/SimpleHTTP/Response.pm M;
+  lib/POE/Component/Server/SimpleHTTP/Connection.pm M;
+  lib/POE/Component/Server/SimpleHTTP.pm M; Makefile.PL M; Changes M
+
+    Move testsuite to use POE::Filter::HTTP::Parser, perltidy everything,
+    bump version
+
 ===========================
 2009-01-22 08:50:54 1.53_03
 ===========================

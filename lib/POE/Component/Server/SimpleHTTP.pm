@@ -9,7 +9,7 @@ use vars qw($VERSION);
 
 # Initialize our version
 # $Revision: 1181 $
-$VERSION = '1.54';
+$VERSION = '1.56';
 
 # Import what we need from the POE namespace
 use POE;
@@ -133,14 +133,10 @@ sub new {
       );
    }
 
-# BinGOS was here: This is unecessary, fall back on default SocketFactory behaviour.
-# Get the ADDRESS
-#if ( exists $opt{'ADDRESS'} and defined $opt{'ADDRESS'} and length( $opt{'ADDRESS'} ) ) {
-#	$ADDRESS = $opt{'ADDRESS'};
-#	delete $opt{'ADDRESS'};
-#} else {
-#	croak( 'ADDRESS is required to create a new POE::Component::Server::SimpleHTTP instance!' );
-#}
+   if ( exists $opt{'ADDRESS'} and defined $opt{'ADDRESS'} and length( $opt{'ADDRESS'} ) ) {
+       $ADDRESS = $opt{'ADDRESS'};
+       delete $opt{'ADDRESS'};
+   }
 
    # Get the HOSTNAME
    if (   exists $opt{'HOSTNAME'}
