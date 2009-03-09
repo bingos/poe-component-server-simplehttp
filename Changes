@@ -1,4 +1,14 @@
 ========================
+2009-02-26 16:24:08 1.56
+========================
+
+  2009-02-26 16:21:41 (r140) by bingos
+  lib/POE/Component/Server/SimpleHTTP.pm M; Changes M
+
+    ADDRESS was not being passed through to the SocketFactory as an
+    option. It does now
+
+========================
 2009-01-23 07:27:00 1.54
 ========================
 

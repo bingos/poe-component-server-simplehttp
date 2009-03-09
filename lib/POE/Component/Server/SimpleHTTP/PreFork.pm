@@ -81,7 +81,8 @@ sub new {
 
          # Okay, pull in what is necessary
          eval {
-            use POE::Component::SSLify
+            require POE::Component::SSLify;
+            import POE::Component::SSLify
               qw( SSLify_Options SSLify_GetSocket Server_SSLify SSLify_GetCipher );
             SSLify_Options(@$SSLKEYCERT);
          };
