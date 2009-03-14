@@ -1051,7 +1051,8 @@ sub Got_Error {
    my ( $operation, $errnum, $errstr, $id ) = @_[ ARG0 .. ARG3 ];
 
    # Only do this for non-EOF on read
-   unless ( $operation eq 'read' and $errnum == 0 ) {
+   #unless ( $operation eq 'read' and $errnum == 0 ) {
+   {
 
       # Debug stuff
       if (DEBUG) {
@@ -1303,8 +1304,6 @@ sub Stream_Output {
         ->set_output_filter( POE::Filter::HTTPD->new() );
       $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]->put($response);
    }
-
-   $response->content();
 
    # we send the event to stream with wheels request and response to the session
    # that has registered the streaming event

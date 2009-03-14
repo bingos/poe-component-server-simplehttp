@@ -117,7 +117,7 @@ sub GOT_STREAM {
 }
 
 sub keepalive { 
-   my ( $heap ) = @_[HEAP];
+   my $heap  = $_[HEAP];
 
    $_[KERNEL]->delay_set('keepalive', 1);
    return;
@@ -164,8 +164,8 @@ sub response {
       # then all streamed data in the second element of the response
       # array ...
       my ($resp, $data) = @$response_packet;
-      chomp($data);
       return unless $data;
+      chomp($data);
       foreach my $hello ( split /\n/, $data ) {
          ok($hello =~ /Hello World/, "Received a hello");
          $heap->{'client_count'}++;
@@ -179,7 +179,7 @@ sub response {
 }
 
 sub on_close {
-    my( $wid ) = @_[ARG0];
+    my $wid  = $_[ARG0];
     is( $STREAMS{$wid}, 0, "on_close comes after CLOSE" );
     delete $STREAMS{ $wid } if $STREAMS{ $wid } == 0;
 }
