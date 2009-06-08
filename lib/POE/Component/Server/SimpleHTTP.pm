@@ -1036,6 +1036,8 @@ sub Must_KeepAlive {
    # Connection is a comma-seperated header
    my $conn = lc $req->header('Connection');
    return 0 if ",$conn," =~ /,\s*close\s*,/;
+   $conn = lc $req->header('Proxy-Connection');
+   return 0 if ",$conn," =~ /,\s*close\s*,/;
    $conn = lc $resp->header('Connection');
    return 0 if ",$conn," =~ /,\s*close\s*,/;
 
@@ -1329,7 +1331,7 @@ sub Fix_Headers {
    }
 
    # Set the Content-Length if needed
-   if (   !$stream
+   if (   !$stream and !$heap->{'PROXYMODE'}
       and !defined $response->header('Content-Length')
       and my $len = length $response->content )
    {

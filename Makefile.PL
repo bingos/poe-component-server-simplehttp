@@ -43,11 +43,10 @@ if ( $value =~ /^Y$/i ) {
 }
 
 # Sanity check
-eval { require IPC::Shareable; };
-build_requires 'POE::Component::Client::HTTP' => 0.82 unless $@;
+build_requires 'POE::Component::Client::HTTP' => 0.82 if can_use 'IPC::Shareable';
 
 # Thanks to Matt Trout for this tip
 #makemaker_args(dist => { PREOP => "$^X ./tools/svn-log.perl > ./Changes" });
-makemaker_args(dist => { PREOP => "git log --tags > ./Changes" });
+makemaker_args(dist => { PREOP => "git --no-pager log --tags > ./Changes" });
 
 WriteAll();
