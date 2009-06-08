@@ -1,40 +1,73 @@
 # Declare our package
 package POE::Component::Server::SimpleHTTP::Connection;
 
-# Standard stuff to catch errors
-use strict qw(subs vars refs);    # Make sure we can't mess up
-use warnings;                     # Enable warnings to catch errors
+use strict;
+use warnings;
 
-# Initialize our version
-# $Revision: 1181 $
 our $VERSION = '1.05';
 
-# Get some things we need
 use Socket qw( inet_ntoa unpack_sockaddr_in );
+use POE;
 
-# Creates a new instance!
-sub new {
+use Moose;
 
-   # Get rid of the class
+has dead => (
+  is => 'rw',
+  isa => 'Bool',
+  default => 0,
+);
+
+has ssl => (
+  is => 'rw',
+  isa => 'Bool',
+  default => 0,
+);
+
+has sslcipher => (
+  is => 'rw',
+  default => undef,
+);
+
+has remote_ip => (
+  is => 'ro',
+);
+
+has remote_port => (
+  is => 'ro',
+);
+
+has remote_addr => (
+  is => 'ro',
+);
+
+has local_ip => (
+  is => 'ro',
+);
+
+has local_port => (
+  is => 'ro',
+);
+
+has local_addr => (
+  is => 'ro',
+);
+
+has ID => (
+  is => 'rw',
+);
+
+has OnClose => (
+  is => 'ro',
+  default => sub { { } },
+);
+
+sub BUILDARGS {
    my $class = shift;
 
-   # Create the hash
-   my $self = {
+   my $self = { };
 
-      # Did the socket die?
-      'DIED' => 0,
-
-      # SSLification status
-      'SSLified' => 0,
-
-      # SSL cipher in use
-      'SSLCipher' => undef,
-   };
-
-   # Get the stuff
    my $socket = shift;
 
-   # Figure out everything!
    eval {
       ( $self->{'remote_port'}, $self->{'remote_addr'} ) =
         unpack_sockaddr_in( getpeername($socket) );
@@ -45,85 +78,33 @@ sub new {
       $self->{'local_ip'} = inet_ntoa( $self->{'local_addr'} );
    };
 
-   # Check for errors!
    if ($@) {
-
-      # Just ignore this socket and return nothing!
       return undef;
    }
 
-   # Bless ourself!
-   bless( $self, 'POE::Component::Server::SimpleHTTP::Connection' );
-
-   # All done!
    return $self;
-}
-
-# Gets the remote_ip
-sub remote_ip {
-   return shift->{'remote_ip'};
-}
-
-# Gets the remote_port
-sub remote_port {
-   return shift->{'remote_port'};
-}
-
-# Gets the remote_addr
-sub remote_addr {
-   return shift->{'remote_addr'};
-}
-
-# Gets the local_addr
-sub local_addr {
-   return shift->{'local_addr'};
-}
-
-# Gets the local_ip
-sub local_ip {
-   return shift->{'local_ip'};
-}
-
-# Gets the local_port
-sub local_port {
-   return shift->{'local_port'};
-}
-
-# Boolean accessor to check if the socket is dead
-sub dead {
-   return shift->{'DIED'};
-}
-
-# Are we SSLified?
-sub ssl {
-   return shift->{'SSLified'};
-}
-
-# What ssl cipher is in use?
-sub sslcipher {
-   return shift->{'SSLCipher'};
-}
-
-sub ID {
-   return shift->{'id'};
 }
 
 sub _on_close {
    my ( $self, $sessionID, $state, @args ) = @_;
    if ($state) {
-      $self->{OnClose}{$sessionID} = [ $state, @args ];
+      $self->OnClose->{$sessionID} = [ $state, @args ];
    }
    else {
-      delete $self->{OnClose}{$sessionID};
+      delete $self->OnClose->{$sessionID};
    }
 }
 
-sub DESTROY {
+sub DEMOLISH {
    my ($self) = @_;
-   while ( my ( $sessionID, $data ) = each %{ $self->{OnClose} || {} } ) {
+   while ( my ( $sessionID, $data ) = each %{ $self->OnClose || {} } ) {
       $POE::Kernel::poe_kernel->call( $sessionID, @$data );
    }
 }
+
+no Moose;
+
+__PACKAGE__->meta->make_immutable;
 
 # End of module
 1;
@@ -174,9 +155,11 @@ L<POE::Component::Server::SimpleHTTP::Response>
 
 Apocalypse E<lt>apocal@cpan.orgE<gt>
 
+Chris C<BinGOs> Williams <chris@bingosnet.co.uk>
+
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2006 by Apocalypse
+Copyright E<copy> Apocalypse and Chris Williams
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

@@ -868,19 +868,19 @@ sub Got_Input {
 
       # If we used SSL, turn on the flag!
       if ( defined $_[HEAP]->{'SSLKEYCERT'} ) {
-         $response->{'CONNECTION'}->{'SSLified'} = 1;
+         $response->{'CONNECTION'}->ssl(1);
 
          # Put the cipher type for people who want it
-         $response->{'CONNECTION'}->{'SSLCipher'} =
+         $response->{'CONNECTION'}->sslcipher(
            SSLify_GetCipher( $_[HEAP]->{'REQUESTS'}->{$id}->[0]
-              ->[POE::Wheel::ReadWrite::HANDLE_INPUT] );
+              ->[POE::Wheel::ReadWrite::HANDLE_INPUT] ) );
       }
    }
 
    # Add this response to the wheel
    $_[HEAP]->{'REQUESTS'}->{$id}->[2] = $response;
    $_[HEAP]->{'REQUESTS'}->{$id}->[3] = $request;
-   $response->{'CONNECTION'}->{id}    = $id;
+   $response->{'CONNECTION'}->ID($id);
 
 # If they have a log handler registered, send out the needed information
 # TODO if we received a malformed request, we will not have a request object
@@ -1076,7 +1076,7 @@ sub Got_Error {
       }
 
       # Mark the client dead
-      $connection->{'DIED'} = 1;
+      $connection->dead(1);
    }
 
    # Success!
