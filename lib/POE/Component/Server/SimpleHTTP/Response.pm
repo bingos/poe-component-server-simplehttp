@@ -1,22 +1,42 @@
-# Declare our package
 package POE::Component::Server::SimpleHTTP::Response;
 
-# Standard stuff to catch errors
-use strict qw(subs vars refs);    # Make sure we can't mess up
-use warnings;                     # Enable warnings to catch errors
+use strict;
+use warnings;
 
-# Initialize our version
-# $Revision: 1181 $
 our $VERSION = '1.04';
 
-# Set our stuff to HTTP::Response
 use base qw( HTTP::Response );
 
-# Creates a new instance!
-sub new {
+use Moose;
+extends qw(HTTP::Response Moose::Object );
 
-   # Remove the tempclass
-   my $tempclass = shift;
+has '_WHEEL' => (
+  is => 'ro',
+);
+
+has 'connection' => (
+  is => 'ro',
+);
+
+has 'STREAM_SESSION' => (
+  is => 'rw',
+);
+
+has 'STREAM' => (
+  is => 'rw',
+);
+
+has 'IS_STREAMING' => (
+  is => 'rw',
+);
+
+has 'DONT_FLUSH' => (
+  is => 'rw',
+  isa => 'Bool',
+);
+
+sub new {
+   my $class = shift;
 
    # Get the Wheel ID
    my $wid = shift;
@@ -29,47 +49,34 @@ sub new {
       die 'Did not get a Wheel ID!';
    }
 
-   # Create the instance!
-   my $self = HTTP::Response->new();
+   my $self = $class->SUPER::new(@_);
 
-   # Add the Wheel ID
-   $self->{'WHEEL_ID'} = $wid;
-
-   # Add the connection object
-   $self->{'CONNECTION'} = $conn;
-
-   # Bless it to ourself!
-   bless( $self, 'POE::Component::Server::SimpleHTTP::Response' );
-
-   # All done!
-   return $self;
-}
-
-# Gets the Wheel ID
-sub _WHEEL {
-   return shift->{'WHEEL_ID'};
-}
-
-# Gets the connection object
-sub connection {
-   return shift->{'CONNECTION'};
+   return $class->meta->new_object(
+          __INSTANCE__ => $self,
+          _WHEEL => $wid,
+	  connection => $conn,
+    );
 }
 
 sub stream {
    my $self = shift;
-   my (%opt) = (@_);
+   my %opt = (@_);
 
    no strict 'refs';
 
    if ( $opt{event} ne '' ) {
-      $self->{'STREAM_SESSION'} = $opt{'session'} || undef;
-      $self->{'STREAM'}         = $opt{'event'};
-      $self->{'DONT_FLUSH'}     = $opt{'dont_flush'};
+      $self->STREAM_SESSION( $opt{'session'} || undef );
+      $self->STREAM( $opt{'event'} );
+      $self->DONT_FLUSH( $opt{'dont_flush'} );
    }
    else {
-      $self->{'STREAM'} = shift;
+      $self->STREAM( shift );
    }
 }
+
+no Moose;
+
+__PACKAGE__->meta->make_immutable( inline_constructor => 0 );
 
 # End of module
 1;

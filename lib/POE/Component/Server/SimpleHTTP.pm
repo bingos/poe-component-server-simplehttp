@@ -809,9 +809,9 @@ sub Got_Input {
 
 # Hack it to simulate POE::Component::Server::SimpleHTTP::Response->new( $id, $conn );
       bless( $response, 'POE::Component::Server::SimpleHTTP::Response' );
-      $response->{'WHEEL_ID'} = $id;
+      $response->_WHEEL( $id );
 
-      $response->{'CONNECTION'} = $connection;
+      $response->connection( $connection );
 
       # Set the path to an empty string
       $path = '';
@@ -850,7 +850,7 @@ sub Got_Input {
    }
 
 # Check if the SimpleHTTP::Connection object croaked ( happens when sockets just disappear )
-   if ( !defined $response->{'CONNECTION'} ) {
+   if ( !defined $response->connection ) {
 
       # Debug stuff
       if (DEBUG) {
@@ -868,10 +868,10 @@ sub Got_Input {
 
       # If we used SSL, turn on the flag!
       if ( defined $_[HEAP]->{'SSLKEYCERT'} ) {
-         $response->{'CONNECTION'}->ssl(1);
+         $response->connection->ssl(1);
 
          # Put the cipher type for people who want it
-         $response->{'CONNECTION'}->sslcipher(
+         $response->connection->sslcipher(
            SSLify_GetCipher( $_[HEAP]->{'REQUESTS'}->{$id}->[0]
               ->[POE::Wheel::ReadWrite::HANDLE_INPUT] ) );
       }
@@ -880,7 +880,7 @@ sub Got_Input {
    # Add this response to the wheel
    $_[HEAP]->{'REQUESTS'}->{$id}->[2] = $response;
    $_[HEAP]->{'REQUESTS'}->{$id}->[3] = $request;
-   $response->{'CONNECTION'}->ID($id);
+   $response->connection->ID($id);
 
 # If they have a log handler registered, send out the needed information
 # TODO if we received a malformed request, we will not have a request object
@@ -1068,7 +1068,7 @@ sub Got_Error {
          delete $c->[0];
       }
       else {
-         $connection = $_[HEAP]->{'REQUESTS'}->{$id}->[2]->{'CONNECTION'};
+         $connection = $_[HEAP]->{'REQUESTS'}->{$id}->[2]->connection;
 
          # Delete this connection
          delete $_[HEAP]->{'REQUESTS'}->{$id}->[0];
@@ -1202,7 +1202,7 @@ sub Stream_Output {
    my $id = $response->_WHEEL;
    $_[HEAP]->{'CHUNKCOUNT'}->{$id}++;
 
-   if ( defined $response->{'STREAM'} ) {
+   if ( defined $response->STREAM ) {
 
       # Keep track if we plan to stream ...
       if ( $_[HEAP]->{'RESPONSES'}->{$id} ) {
@@ -1279,19 +1279,19 @@ sub Stream_Output {
    }
 
    # Sets the correct POE::Filter
-   unless ( defined $response->{'IS_STREAMING'} ) {
+   unless ( defined $response->IS_STREAMING ) {
 
       # Mark this socket done
       $_[HEAP]->{'REQUESTS'}->{$id}->[1] = 2;
 
       #
-      $response->{'IS_STREAMING'} = 1;
+      $response->IS_STREAMING(1);
    }
 
    if (DEBUG) {
       warn "Sending stream via "
-        . $response->{STREAM_SESSION} . "/"
-        . $response->{STREAM}
+        . $response->STREAM_SESSION . "/"
+        . $response->STREAM
         . " with id $id \n";
    }
 
@@ -1309,10 +1309,10 @@ sub Stream_Output {
 
    # we send the event to stream with wheels request and response to the session
    # that has registered the streaming event
-   unless ( $response->{'DONT_FLUSH'} ) {
+   unless ( $response->DONT_FLUSH ) {
       POE::Kernel->post(
-         $response->{STREAM_SESSION},    # callback session
-         $response->{STREAM},            # callback event
+         $response->STREAM_SESSION,    # callback session
+         $response->STREAM,            # callback event
          $_[HEAP]->{'RESPONSES'}->{ $response->_WHEEL }
       );
    }
