@@ -13,7 +13,6 @@ use HTTP::Request;
 use POE;
 use POE::Kernel;
 use POE::Component::Server::SimpleHTTP;
-use Data::Dumper;
 
 my $PORT = 2080;
 my $IP = "localhost";
@@ -65,7 +64,6 @@ POE::Session->create(
 $poe_kernel->run();
 
 is( 0+keys %STREAMS, 0, "No open streams" );
-
 exit 0;
 
 sub GOT_MAIN {

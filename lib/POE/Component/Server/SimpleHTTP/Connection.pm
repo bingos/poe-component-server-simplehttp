@@ -89,16 +89,19 @@ sub _on_close {
    my ( $self, $sessionID, $state, @args ) = @_;
    if ($state) {
       $self->OnClose->{$sessionID} = [ $state, @args ];
+      $poe_kernel->refcount_increment( $sessionID, __PACKAGE__ );
    }
    else {
-      delete $self->OnClose->{$sessionID};
+      my $data = delete $self->OnClose->{$sessionID};
+      $poe_kernel->refcount_decrement( $sessionID, __PACKAGE__ ) if $data;
    }
 }
 
 sub DEMOLISH {
    my ($self) = @_;
    while ( my ( $sessionID, $data ) = each %{ $self->OnClose || {} } ) {
-      $POE::Kernel::poe_kernel->call( $sessionID, @$data );
+      $poe_kernel->call( $sessionID, @$data );
+      $poe_kernel->refcount_decrement( $sessionID, __PACKAGE__ );
    }
 }
 

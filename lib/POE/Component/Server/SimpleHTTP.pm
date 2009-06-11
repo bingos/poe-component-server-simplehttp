@@ -1,37 +1,26 @@
-# Declare our package
 package POE::Component::Server::SimpleHTTP;
 
-# Standard stuff to catch errors
-use strict qw(subs vars refs);    # Make sure we can't mess up
+use strict;
 use warnings;
 
 use vars qw($VERSION);
 
-# Initialize our version
-# $Revision: 1181 $
 $VERSION = '1.58';
 
-# Import what we need from the POE namespace
 use POE;
 use POE::Wheel::SocketFactory;
 use POE::Wheel::ReadWrite;
-use POE::Driver::SysRW;
 use POE::Filter::HTTPD;
 use POE::Filter::Stream;
 
-# Other miscellaneous modules we need
 use Carp qw( croak );
 use Socket;
 
-# HTTP-related modules
 use HTTP::Date qw( time2str );
 
-# Our own HTTP modules
 use POE::Component::Server::SimpleHTTP::Connection;
 use POE::Component::Server::SimpleHTTP::Response;
 
-#sub DEBUG {1}
-#Set some constants
 BEGIN {
 
    # Debug fun!
@@ -45,393 +34,223 @@ BEGIN {
    }
 }
 
-# Set things in motion!
-sub new {
+use MooseX::POE;
+use MooseX::AttributeHelpers;
+use Moose::Util::TypeConstraints;
 
-   # Get the OOP's type
-   my $type = shift;
 
-   # Sanity checking
-   if ( @_ & 1 ) {
-      croak(
-         'POE::Component::Server::SimpleHTTP->new needs even number of options'
-      );
-   }
+has 'alias' => (
+  is => 'ro',
+);
 
-   # The options hash
-   my %opt = @_;
-   $opt{ uc $_ } = delete $opt{$_}
-     for keys %opt;    # Fix that pesky uppercase option stuff.
+has 'address' => (
+  is => 'ro',
+);
 
-   # Our own options
-   my (
-      $ALIAS,        $ADDRESS,      $PORT,        $HOSTNAME,
-      $HEADERS,      $HANDLERS,     $SSLKEYCERT,  $LOGHANDLER,
-      $ERRORHANDLER, $SETUPHANDLER, $LOG2HANDLER, $PROXYMODE
-   );
+has 'port' => ( 
+  is => 'ro',
+  default => sub { 0 },
+  writer => '_set_port',
+);
 
-   # You could say I should do this: $Stuff = delete $opt{'Stuff'}
-   # But, that kind of behavior is not defined, so I would not trust it...
+has 'hostname' => (
+  is => 'ro',
+  default => sub { require Sys::Hostname; return Sys::Hostname::hostname(); },
+);
 
-   # Get the SSL array
-   if ( exists $opt{'SSLKEYCERT'} and defined $opt{'SSLKEYCERT'} ) {
+has 'proxymode' => (
+  is => 'ro',
+  isa => 'Bool',
+  default => sub { 0 },
+);
 
-      # Test if it is an array
-      if ( ref( $opt{'SSLKEYCERT'} ) eq 'ARRAY'
-         and scalar( @{ $opt{'SSLKEYCERT'} } ) == 2 )
-      {
-         $SSLKEYCERT = $opt{'SSLKEYCERT'};
-         delete $opt{'SSLKEYCERT'};
+has 'keepalive' => (
+  is => 'ro',
+  isa => 'Bool',
+  default => sub { 0 },
+);
 
-         # Okay, pull in what is necessary
-         eval {
-            require POE::Component::SSLify;
-            import POE::Component::SSLify
-              qw( SSLify_Options SSLify_GetSocket Server_SSLify SSLify_GetCipher );
-            SSLify_Options(@$SSLKEYCERT);
-         };
-         if ($@) {
-            if (DEBUG) {
-               warn "Unable to load PoCo::SSLify -> $@";
-            }
+has 'sslkeycert' => (
+  is => 'ro',
+  isa => subtype 'ArrayRef' => where { scalar @$_ == 2 },
+);
 
-            # Force ourself to not use SSL
-            $SSLKEYCERT = undef;
-         }
-      }
-      else {
-         if (DEBUG) {
-            warn
-'The SSLKEYCERT option must be an array with exactly 2 elements in it!';
-         }
-      }
-   }
-   else {
-      $SSLKEYCERT = undef;
-   }
+has 'headers' => (
+  is => 'ro',
+  isa => 'HashRef',
+  default => sub {{}},
+);
 
-   # Get the session alias
-   if (   exists $opt{'ALIAS'}
-      and defined $opt{'ALIAS'}
-      and length( $opt{'ALIAS'} ) )
-   {
-      $ALIAS = $opt{'ALIAS'};
-      delete $opt{'ALIAS'};
-   }
+has 'handlers' => (
+  is => 'ro',
+  isa => 'ArrayRef',
+  required => 1,
+  writer => '_set_handlers',
+);
 
-   # Get the PORT
-   if (   exists $opt{'PORT'}
-      and defined $opt{'PORT'}
-      and length( $opt{'PORT'} ) )
-   {
-      $PORT = $opt{'PORT'};
-      delete $opt{'PORT'};
-   }
-   else {
-      croak(
-'PORT is required to create a new POE::Component::Server::SimpleHTTP instance!'
-      );
-   }
+has 'errorhandler' => (
+  is => 'ro',
+  isa => 'HashRef',
+);
 
-   if ( exists $opt{'ADDRESS'} and defined $opt{'ADDRESS'} and length( $opt{'ADDRESS'} ) ) {
-       $ADDRESS = $opt{'ADDRESS'};
-       delete $opt{'ADDRESS'};
-   }
+has 'loghandler' => (
+  is => 'ro',
+  isa => 'HashRef',
+);
 
-   # Get the HOSTNAME
-   if (   exists $opt{'HOSTNAME'}
-      and defined $opt{'HOSTNAME'}
-      and length( $opt{'HOSTNAME'} ) )
-   {
-      $HOSTNAME = $opt{'HOSTNAME'};
-      delete $opt{'HOSTNAME'};
-   }
-   else {
-      if (DEBUG) {
-         warn 'Using Sys::Hostname for HOSTNAME';
-      }
+has 'log2handler' => (
+  is => 'ro',
+  isa => 'HashRef',
+);
 
-      # Figure out the hostname
-      require Sys::Hostname;
-      $HOSTNAME = Sys::Hostname::hostname();
+has 'setuphandler' => (
+  is => 'ro',
+  isa => 'HashRef',
+);
 
-      # Get rid of any lingering HOSTNAME
-      if ( exists $opt{'HOSTNAME'} ) {
-         delete $opt{'HOSTNAME'};
-      }
-   }
+has 'retries' => (
+  metaclass => 'Counter',
+  is        => 'ro',
+  isa       => 'Num',
+  default   => sub { 0 },
+  provides  => {
+    inc => 'inc_retry',
+    dec => 'dec_retry',          
+    reset => 'reset_retries',
+  },
+);
 
-   # Get the HEADERS
-   if ( exists $opt{'HEADERS'} and defined $opt{'HEADERS'} ) {
+has '_requests' => (
+  is => 'ro',
+  isa => 'HashRef',
+  default => sub {{}},
+  init_arg => undef,
+  clearer => '_clear_requests',
+);
 
-      # Make sure it is ref to hash
-      if ( ref $opt{'HEADERS'} and ref( $opt{'HEADERS'} ) eq 'HASH' ) {
-         $HEADERS = $opt{'HEADERS'};
-         delete $opt{'HEADERS'};
-      }
-      else {
-         croak('HEADERS must be a reference to a HASH!');
-      }
-   }
-   else {
+has '_connections' => (
+  is => 'ro',
+  isa => 'HashRef',
+  default => sub {{}},
+  init_arg => undef,
+  clearer => '_clear_connections',
+);
 
-      # Set to none
-      $HEADERS = {};
+has '_chunkcount' => (
+  is => 'ro',
+  isa => 'HashRef',
+  default => sub {{}},
+  init_arg => undef,
+  clearer => '_clear_chunkcount',
+);
 
-      # Get rid of any lingering HEADERS
-      if ( exists $opt{'HEADERS'} ) {
-         delete $opt{'HEADERS'};
-      }
-   }
+has '_responses' => (
+  is => 'ro',
+  isa => 'HashRef',
+  default => sub {{}},
+  init_arg => undef,
+  clearer => '_clear_responses',
+);
 
-   # Get the HANDLERS
-   if ( exists $opt{'HANDLERS'} and defined $opt{'HANDLERS'} ) {
+has '_factory' => (
+  is => 'ro',
+  isa => 'POE::Wheel::SocketFactory',
+  init_arg => undef,
+  clearer => '_clear_factory',
+  writer =>  '_set_factory',
+);
 
-      # Make sure it is ref to array
-      if ( ref $opt{'HANDLERS'} and ref( $opt{'HANDLERS'} ) eq 'ARRAY' ) {
-         $HANDLERS = $opt{'HANDLERS'};
-         delete $opt{'HANDLERS'};
-      }
-      else {
-         croak('HANDLERS must be a reference to an ARRAY!');
-      }
-   }
-   else {
-      croak(
-'HANDLERS is required to create a new POE::Component::Server::SimpleHTTP instance!'
-      );
-   }
+sub BUILDARGS {
+  my $class = shift;
+  my %args = @_;
+  $args{lc $_} = delete $args{$_} for keys %args;
 
-   # Get the ERRORHANDLER handler
-   if ( exists $opt{'ERRORHANDLER'} and defined $opt{'ERRORHANDLER'} ) {
+  if ( $args{sslkeycert} and ref $args{sslkeycert} eq 'ARRAY'
+	and scalar @{ $args{sslkeycert} } == 2 ) {  
 
-      # Make sure it is ref to an hash
-      if ( ref $opt{'ERRORHANDLER'} and ref( $opt{'ERRORHANDLER'} ) eq 'HASH' )
-      {
-         $ERRORHANDLER = delete $opt{'ERRORHANDLER'};
-         croak('ERRORHANDLER does not have a SESSION attribute')
-           unless $ERRORHANDLER->{'SESSION'};
-         croak('ERRORHANDLER does not have an EVENT attribute')
-           unless $ERRORHANDLER->{'EVENT'};
-      }
-      else {
-         croak('ERRORHANDLER must be a reference to an HASH!');
-      }
-   }
+     eval {
+       require POE::Component::SSLify;
+       import POE::Component::SSLify
+         qw( SSLify_Options SSLify_GetSocket Server_SSLify SSLify_GetCipher );
+       SSLify_Options( @{ $args{sslkeycert} } );
+     };
+     if ($@) {
+        warn "Unable to load PoCo::SSLify -> $@" if DEBUG;
+	delete $args{sslkeycert};
+     }
+  }
 
-   if ( exists $opt{'LOGHANDLER'} and defined $opt{'LOGHANDLER'} ) {
-      if ( ref $opt{'LOGHANDLER'} and ref $opt{'LOGHANDLER'} eq 'HASH' ) {
-         $LOGHANDLER = delete $opt{'LOGHANDLER'};
-         croak('LOGHANDLER does not have a SESSION attribute')
-           unless $LOGHANDLER->{'SESSION'};
-         croak('LOGHANDLER does not have an EVENT attribute')
-           unless $LOGHANDLER->{'EVENT'};
-      }
-      else {
-         croak('LOGHANDLER must be a reference to an HASH!');
-      }
-   }
-
-   if ( exists $opt{'LOG2HANDLER'} and defined $opt{'LOG2HANDLER'} ) {
-      if ( ref $opt{'LOG2HANDLER'} and ref $opt{'LOG2HANDLER'} eq 'HASH' ) {
-         $LOG2HANDLER = delete $opt{'LOG2HANDLER'};
-         croak('LOG2HANDLER does not have a SESSION attribute')
-           unless $LOG2HANDLER->{'SESSION'};
-         croak('LOG2HANDLER does not have an EVENT attribute')
-           unless $LOG2HANDLER->{'EVENT'};
-      }
-      else {
-         croak('LOG2HANDLER must be a reference to an HASH!');
-      }
-   }
-
-   if ( exists $opt{'SETUPHANDLER'} and defined $opt{'SETUPHANDLER'} ) {
-      if ( ref $opt{'SETUPHANDLER'} and ref $opt{'SETUPHANDLER'} eq 'HASH' ) {
-         $SETUPHANDLER = delete $opt{'SETUPHANDLER'};
-         croak('SETUPHANDLER does not have a SESSION attribute')
-           unless $SETUPHANDLER->{'SESSION'};
-         croak('SETUPHANDLER does not have an EVENT attribute')
-           unless $SETUPHANDLER->{'EVENT'};
-      }
-      else {
-         croak('SETUPHANDLER must be a reference to an HASH!');
-      }
-   }
-
-   $PROXYMODE = $opt{'PROXYMODE'};
-
-   my $KEEPALIVE = 0;
-   if ( exists $opt{'KEEPALIVE'} ) {
-      $KEEPALIVE = delete $opt{'KEEPALIVE'};
-   }
-
-   # Anything left over is unrecognized
-   if (DEBUG) {
-      if ( keys %opt > 0 ) {
-         croak(
-'Unrecognized options were present in POE::Component::Server::SimpleHTTP->new -> '
-              . join( ', ', keys %opt ) );
-      }
-   }
-
-   my $data = {
-      'ALIAS'        => $ALIAS,
-      'ADDRESS'      => $ADDRESS,
-      'PORT'         => $PORT,
-      'HEADERS'      => $HEADERS,
-      'HOSTNAME'     => $HOSTNAME,
-      'HANDLERS'     => $HANDLERS,
-      'REQUESTS'     => {},
-      'RETRIES'      => 0,
-      'SSLKEYCERT'   => $SSLKEYCERT,
-      'LOGHANDLER'   => $LOGHANDLER,
-      'LOG2HANDLER'  => $LOG2HANDLER,
-      'SETUPHANDLER' => $SETUPHANDLER,
-      'ERRORHANDLER' => $ERRORHANDLER,
-      'PROXYMODE'    => $PROXYMODE,
-      'KEEPALIVE'    => $KEEPALIVE
-   };
-
-   my $self = bless $data, $type;
-
-   # Create a new session for ourself
-   $self->{SESSION_ID} = POE::Session->create(
-
-      # Our subroutines
-      'inline_states' => {
-
-         # Maintenance events
-         '_start' => \&StartServer,
-         '_stop'  => \&FindRequestLeaks,
-         '_child' => sub { },
-
-         # Register states
-         'REGISTER' => \&Register,
-
-         # HANDLER stuff
-         'GETHANDLERS' => \&GetHandlers,
-         'SETHANDLERS' => \&SetHandlers,
-
-         # SocketFactory events
-         'SHUTDOWN'      => \&StopServer,
-         'STOPLISTEN'    => \&StopListen,
-         'STARTLISTEN'   => \&StartListen,
-         'SetupListener' => \&SetupListener,
-         'ListenerError' => \&ListenerError,
-
-         # Wheel::ReadWrite stuff
-         'Got_Connection' => \&Got_Connection,
-         'Got_Input'      => \&Got_Input,
-         'Got_Flush'      => \&Got_Flush,
-         'Got_Error'      => \&Got_Error,
-
-         # Send output to connection!
-         'DONE' => \&Request_Output,
-
-         # Stream output to connection!
-         'STREAM' => \&Stream_Output,
-
-         # Kill the connection!
-         'CLOSE' => \&Request_Close,
-
-         # Set close handler for a connection
-         'SETCLOSEHANDLER' => \&SetCloseHandler
-      },
-
-      # Set up the heap for ourself
-      'heap' => $self,
-   )->ID();
-
-   # Return success
-   return $self;
+  return $class->SUPER::BUILDARGS(%args);
 }
 
 sub session_id {
-   $_[0]->{SESSION_ID};
+  return shift->get_session_id;
 }
 
 sub getsockname {
+   # This will need changing
    $_[0]->{SOCKETFACTORY}->getsockname;
 }
 
 sub shutdown {
    my $self = shift;
-   $poe_kernel->call( $self->{SESSION_ID}, 'SHUTDOWN', @_ );
+   $poe_kernel->call( $self->get_session_id, 'SHUTDOWN', @_ );
 }
 
+# Refactor this probably will become STOP
 # This subroutine, when SimpleHTTP exits, will search for leaks
-sub FindRequestLeaks {
-
+sub STOP {
+   my $self = $_[OBJECT];
    # Loop through all of the requests
-   foreach my $req ( keys %{ $_[HEAP]->{'REQUESTS'} } ) {
+   foreach my $req ( keys %{ $self->_requests } ) {
 
       # Bite the programmer!
       warn 'Did not get DONE/CLOSE event for Wheel ID ' 
         . $req
         . ' from IP '
-        . $_[HEAP]->{'REQUESTS'}->{$req}->[2]->connection->remote_ip;
+        . $self->_requests->{$req}->[2]->connection->remote_ip;
    }
 
    # All done!
    return 1;
 }
 
-# Starts the server!
-sub StartServer {
-   my $heap = $_[HEAP];
-
-   # Debug stuff
-   if (DEBUG) {
-      warn 'Starting up SimpleHTTP now';
-   }
-
-   $heap->{SESSION_ID} = $_[SESSION]->ID();
-
-   # Register an alias for ourself
-   $poe_kernel->alias_set( $heap->{'ALIAS'} ) if $heap->{'ALIAS'};
-   $poe_kernel->refcount_increment( $heap->{SESSION_ID}, __PACKAGE__ )
-     unless $heap->{'ALIAS'};
-
-   # Massage the handlers!
-   MassageHandlers( $heap->{'HANDLERS'} );
-
-   # Setup the wheel
-   $poe_kernel->yield('SetupListener');
-
-   # All done!
-   return 1;
+sub START {
+  my ($kernel,$self) = @_[KERNEL,OBJECT];
+  $kernel->alias_set( $self->alias ) if $self->alias;
+  $kernel->refcount_increment( $self->get_session_id, __PACKAGE__ )
+	unless $self->alias;
+  MassageHandlers( $self->handlers );
+  # Start Listener
+  $kernel->yield( 'start_listener' );
+  return;
 }
 
+# 'SHUTDOWN'
 # Stops the server!
-sub StopServer {
-
+event 'SHUTDOWN' => sub {
+   my ($kernel,$self,$graceful) = @_[KERNEL,OBJECT,ARG0];
    # Shutdown the SocketFactory wheel
-   if ( exists $_[HEAP]->{'SOCKETFACTORY'} ) {
-      delete $_[HEAP]->{'SOCKETFACTORY'};
-   }
+   $self->_clear_factory if $self->_factory;
 
    # Debug stuff
-   if (DEBUG) {
-      warn 'Stopped listening for new connections!';
-   }
+   warn 'Stopped listening for new connections!' if DEBUG;
 
    # Are we gracefully shutting down or not?
-   if ( defined $_[ARG0] and $_[ARG0] eq 'GRACEFUL' ) {
+   if ( $graceful ) {
 
       # Check for number of requests
-      if ( keys( %{ $_[HEAP]->{'REQUESTS'} } ) == 0 ) {
+      if ( keys( %{ $self->_requests } ) == 0 ) {
 
          # Alright, shutdown anyway
 
          # Delete our alias
-         $_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} ) if $_[HEAP]->{'ALIAS'};
-         $_[KERNEL]->refcount_decrement( $_[HEAP]->{'SESSION_ID'}, __PACKAGE__ )
-           unless $_[HEAP]->{'ALIAS'};
+         $kernel->alias_remove( $_ ) for $kernel->alias_list();
+         $kernel->refcount_decrement( $self->get_session_id, __PACKAGE__ )
+           unless $self->alias;
 
          # Debug stuff
-         if (DEBUG) {
-            warn 'Stopped SimpleHTTP gracefully, no requests left';
-         }
+         warn 'Stopped SimpleHTTP gracefully, no requests left' if DEBUG;
       }
 
       # All done!
@@ -439,14 +258,13 @@ sub StopServer {
    }
 
    # Forcibly close all sockets that are open
-   foreach my $S ( $_[HEAP]->{'REQUESTS'}, $_[HEAP]->{'CONNECTIONS'} ) {
+   foreach my $S ( $self->_requests, $self->_connections ) {
       foreach my $conn ( keys %$S ) {
 
    # Can't call method "shutdown_input" on an undefined value at
    # /usr/lib/perl5/site_perl/5.8.2/POE/Component/Server/SimpleHTTP.pm line 323.
          if (   defined $S->{$conn}->[0]
-            and defined $S->{$conn}->[0]->[POE::Wheel::ReadWrite::HANDLE_INPUT]
-           )
+            and defined $S->{$conn}->[0]->get_input_handle() )
          {
             $S->{$conn}->[0]->shutdown_input;
             $S->{$conn}->[0]->shutdown_output;
@@ -458,160 +276,121 @@ sub StopServer {
    }
 
    # Delete our alias
-   $_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} ) if $_[HEAP]->{'ALIAS'};
-   $_[KERNEL]->refcount_decrement( $_[HEAP]->{'SESSION_ID'}, __PACKAGE__ )
-     unless $_[HEAP]->{'ALIAS'};
+   $kernel->alias_remove( $_ ) for $kernel->alias_list();
+   $kernel->refcount_decrement( $self->get_session_id, __PACKAGE__ )
+     unless $self->alias;
 
    # Debug stuff
-   if (DEBUG) {
-      warn 'Successfully stopped SimpleHTTP';
-   }
+   warn 'Successfully stopped SimpleHTTP' if DEBUG;
 
    # Return success
    return 1;
-}
+};
 
 # Sets up the SocketFactory wheel :)
-sub SetupListener {
+event 'start_listener' => sub {
+   my ($kernel,$self,$noinc) = @_[KERNEL,OBJECT,ARG0];
 
-   # Debug stuff
-   my $heap = $_[HEAP];
-   if (DEBUG) {
-      warn 'Creating SocketFactory wheel now';
-   }
+   warn "Creating SocketFactory wheel now\n" if DEBUG;
 
    # Check if we should set up the wheel
-   if ( $heap->{'RETRIES'} == MAX_RETRIES ) {
+   if ( $self->retries == MAX_RETRIES ) {
       die 'POE::Component::Server::SimpleHTTP tried '
         . MAX_RETRIES
         . ' times to create a Wheel and is giving up...';
    }
    else {
 
-      # Increment the retry count if we did not get 'NOINC' as an argument
-      if ( !defined $_[ARG0] ) {
-
-         # Increment the retries count
-         $heap->{'RETRIES'}++;
-      }
+      $self->inc_retry unless $noinc;
 
       # Create our own SocketFactory Wheel :)
-      $heap->{'SOCKETFACTORY'} = POE::Wheel::SocketFactory->new(
-         'BindPort'     => $heap->{'PORT'},
-         'BindAddress'  => $heap->{'ADDRESS'},
-         'Reuse'        => 'yes',
-         'SuccessEvent' => 'Got_Connection',
-         'FailureEvent' => 'ListenerError',
+      my $factory = POE::Wheel::SocketFactory->new(
+         BindPort     => $self->port,
+         ( $self->address ? ( BindAddress => $self->address ) : () ),
+         Reuse        => 'yes',
+         SuccessEvent => 'got_connection',
+         FailureEvent => 'listener_error',
       );
+
       my ( $port, $address ) =
-        sockaddr_in( $heap->{'SOCKETFACTORY'}->getsockname );
-      $heap->{'PORT'} = $port if $heap->{'PORT'} == 0;
-      $poe_kernel->post(
-         $heap->{'SETUPHANDLER'}->{'SESSION'},
-         $heap->{'SETUPHANDLER'}->{'EVENT'},
-         $port, $address,
-      ) if $heap->{'SETUPHANDLER'};
+        sockaddr_in( $factory->getsockname );
+      $self->_set_port( $port ) if $self->port == 0;
+
+      $self->_set_factory( $factory );
+
+      if ( $self->setuphandler ) {
+	 my $setuphandler = $self->setuphandler;
+         if ( $setuphandler->{POSTBACK} and 
+		ref $setuphandler->{POSTBACK} eq 'POE::Session::AnonEvent' ) {
+            $setuphandler->{POSTBACK}->( $port, $address );
+         }
+         else {
+            $kernel->post(
+               $setuphandler->{'SESSION'},
+               $setuphandler->{'EVENT'},
+               $port, $address,
+	    );
+         }
+      }
    }
 
-   # Success!
    return 1;
-}
+};
 
 # Got some sort of error from SocketFactory
-sub ListenerError {
+event listener_error => sub {
+   my ($kernel,$self,$operation,$errnum,$errstr,$wheel_id) = @_[KERNEL,OBJECT,ARG0..ARG3];
+   warn
+     "SocketFactory Wheel $wheel_id generated $operation error $errnum: $errstr\n"
+	if DEBUG;
 
-   # ARG0 = operation, ARG1 = error number, ARG2 = error string, ARG3 = wheel ID
-   my ( $operation, $errnum, $errstr, $wheel_id ) = @_[ ARG0 .. ARG3 ];
-
-   # Debug stuff
-   if (DEBUG) {
-      warn
-"SocketFactory Wheel $wheel_id generated $operation error $errnum: $errstr\n";
-   }
-
-   # Setup the SocketFactory wheel
-   $_[KERNEL]->call( $_[SESSION], 'SetupListener' );
-
-   # Success!
+   $self->call( 'start_listener' );
    return 1;
-}
+};
 
+# 'STARTLISTEN'
 # Starts listening on the socket
-sub StartListen {
-   if (DEBUG) {
-      warn 'STARTLISTEN called, resuming accepts on SocketFactory';
-   }
-
-   # Setup the SocketFactory wheel
-   $_[KERNEL]->call( $_[SESSION], 'SetupListener', 'NOINC' );
-
-   # All done!
+event 'STARTLISTEN' => sub {
+   warn 'STARTLISTEN called, resuming accepts on SocketFactory'
+     if DEBUG;
+   $_[OBJECT]->call( 'start_listener', 'noinc' );
    return 1;
-}
+};
 
+# 'STOPLISTEN'
 # Stops listening on the socket
-sub StopListen {
-   if (DEBUG) {
-      warn 'STOPLISTEN called, pausing accepts on SocketFactory';
-   }
-
-   # We have to get rid of the SocketFactory wheel...
-   if ( exists $_[HEAP]->{'SOCKETFACTORY'} ) {
-      $_[HEAP]->{'SOCKETFACTORY'} = undef;
-   }
-
-   # All done!
+event 'STOPLISTEN' => sub {
+   my $self = $_[OBJECT];
+   warn 'STOPLISTEN called, pausing accepts on SocketFactory'
+     if DEBUG;
+   $self->_clear_factory if $self->_factory;
    return 1;
-}
+};
 
+# 'SETHANDLERS'
 # Sets the HANDLERS
-sub SetHandlers {
-
-   # ARG0 = ref to handlers array
-   my $handlers = $_[ARG0];
-
-   # Validate it...
+event 'SETHANDLERS' => sub {
+   my ($self,$handlers) = @_[OBJECT,ARG0];
    MassageHandlers($handlers);
-
-   # If we got here, passed tests!
-   $_[HEAP]->{'HANDLERS'} = $handlers;
-
-   # All done!
+   $self->_set_handlers( $handlers );
    return 1;
-}
+};
 
+# 'GETHANDLERS'
 # Gets the HANDLERS
-sub GetHandlers {
-
-   # ARG0 = session, ARG1 = event
-   my ( $session, $event ) = @_[ ARG0, ARG1 ];
-
-   # Validation
-   if ( !defined $session or !defined $event ) {
-      return undef;
-   }
-
-   # Make a deep copy of the handlers
+event 'GETHANDLERS' => sub {
+   my ($kernel,$self,$session,$event ) = @_[KERNEL,OBJECT,ARG0,ARG1];
+   return unless $session and $event;
    require Storable;
-
-   my $handlers = Storable::dclone( $_[HEAP]->{'HANDLERS'} );
-
-   # Remove the RE part
-   foreach my $ary (@$handlers) {
-      delete $ary->{'RE'};
-   }
-
-   # All done!
-   $_[KERNEL]->post( $session, $event, $handlers );
-
-   # All done!
+   my $handlers = Storable::dclone( $self->handlers );
+   delete $_->{'RE'} for @{ $handlers };
+   $kernel->post( $session, $event, $handlers );
    return 1;
-}
+};
 
 # This subroutine massages the HANDLERS for internal use
+# Should probably support POSTBACK/CALLBACK
 sub MassageHandlers {
-
-   # Get the ref to handlers
    my $handler = shift;
 
    # Make sure it is ref to array
@@ -681,20 +460,22 @@ sub MassageHandlers {
    return 1;
 }
 
+# 'Got_Connection'
 # The actual manager of connections
-sub Got_Connection {
+event 'got_connection' => sub {
+   my ($kernel,$self,$socket,$peeraddr,$peerport) = @_[KERNEL,OBJECT,ARG0..ARG2];
+   my $sockaddr = inet_ntoa( ( unpack_sockaddr_in ( CORE::getsockname $socket ) )[1] );
+   my $sockport = ( unpack_sockaddr_in ( CORE::getsockname $socket ) )[0];
 
-   # ARG0 = Socket, ARG1 = Remote Address, ARG2 = Remote Port
-   my $socket = $_[ARG0];
 
    # Should we SSLify it?
-   if ( defined $_[HEAP]->{'SSLKEYCERT'} ) {
+   if ( $self->sslkeycert ) {
 
       # SSLify it!
       eval { $socket = Server_SSLify($socket) };
       if ($@) {
          warn "Unable to turn on SSL for connection from "
-           . Socket::inet_ntoa( $_[ARG1] )
+           . Socket::inet_ntoa( $peeraddr )
            . " -> $@";
          close $socket;
          return 1;
@@ -703,24 +484,23 @@ sub Got_Connection {
 
    # Set up the Wheel to read from the socket
    my $wheel = POE::Wheel::ReadWrite->new(
-      'Handle'       => $socket,
-      'Driver'       => POE::Driver::SysRW->new(),
-      'Filter'       => POE::Filter::HTTPD->new(),
-      'InputEvent'   => 'Got_Input',
-      'FlushedEvent' => 'Got_Flush',
-      'ErrorEvent'   => 'Got_Error',
+      Handle       => $socket,
+      Filter       => POE::Filter::HTTPD->new(),
+      InputEvent   => 'got_input',
+      FlushedEvent => 'got_flush',
+      ErrorEvent   => 'got_error',
    );
 
-   if ( DEBUG and keys %{ $_[HEAP]->{CONNECTIONS} } ) {
+   if ( DEBUG and keys %{ $self->_connections } ) {
 
       # use Data::Dumper;
       warn "conn id=", $wheel->ID, " [",
-        join( ', ', keys %{ $_[HEAP]->{CONNECTIONS} } ), "]";
+        join( ', ', keys %{ $self->_connections } ), "]";
    }
 
    # Save this wheel!
    # 0 = wheel, 1 = Output done?, 2 = SimpleHTTP::Response object
-   $_[HEAP]->{'REQUESTS'}->{ $wheel->ID } = [ $wheel, 0, undef ];
+   $self->_requests->{ $wheel->ID } = [ $wheel, 0, undef ];
 
    # Debug stuff
    if (DEBUG) {
@@ -730,76 +510,62 @@ sub Got_Connection {
 
    # Success!
    return 1;
-}
+};
 
+# 'Got_Input'
 # Finally got input, set some stuff and send away!
-sub Got_Input {
-
-   # ARG0 = HTTP::Request object, ARG1 = Wheel ID
-   my ( $request, $id ) = @_[ ARG0, ARG1 ];
-
+event 'got_input' => sub {
+   my ($kernel,$self,$request,$id) = @_[KERNEL,OBJECT,ARG0,ARG1];
    my $connection;
 
    # Was this request Keep-Alive?
-   if ( $_[HEAP]->{'CONNECTIONS'}->{$id} ) {
-      my $c = delete $_[HEAP]->{'CONNECTIONS'}->{$id};
-      $_[HEAP]->{'REQUESTS'}->{$id} = [ $c->[0], 0, undef ];
+   if ( $self->_connections->{$id} ) {
+      my $c = delete $self->_connections->{$id};
+      $self->_requests->{$id} = [ $c->[0], 0, undef ];
       $connection = $c->[1];
-      if (DEBUG) {
-         warn "Keep-alive id=$id next request...";
-      }
+      warn "Keep-alive id=$id next request..." if DEBUG;
    }
 
    # Quick check to see if the socket died already...
    # Initially reported by Tim Wood
-   if (  !defined $_[HEAP]->{'REQUESTS'}->{$id}->[0]
-      or !
-      defined $_[HEAP]->{'REQUESTS'}->{$id}->[0]
-      ->[POE::Wheel::ReadWrite::HANDLE_INPUT] )
-   {
-      if (DEBUG) {
-         warn 'Got a request, but socket died already!';
-      }
+   unless ( defined $self->_requests->{$id}->[0] and 
+      $self->_requests->{$id}->[0]->get_input_handle() ) {
 
+      warn 'Got a request, but socket died already!' if DEBUG;
       # Destroy this wheel!
-      delete $_[HEAP]->{'REQUESTS'}->{$id}->[0];
-      delete $_[HEAP]->{'REQUESTS'}->{$id};
-
-      # All done!
+      delete $self->_requests->{$id}->[0];
+      delete $self->_requests->{$id};
       return;
    }
 
-   if ($connection) {
+   SWITCH: {
 
-      # connection was kept-alive
-   }
+     last SWITCH if $connection; # connection was kept-alive
 
-# Directly access POE::Wheel::ReadWrite's HANDLE_INPUT -> to get the socket itself
-# Hmm, if we are SSL, then have to do an extra step!
-   elsif ( defined $_[HEAP]->{'SSLKEYCERT'} ) {
+     # Directly access POE::Wheel::ReadWrite's HANDLE_INPUT -> to get the socket itself
+     # Hmm, if we are SSL, then have to do an extra step!
+     if ( $self->sslkeycert ) {
+        $connection = POE::Component::Server::SimpleHTTP::Connection->new(
+            SSLify_GetSocket(
+               $self->_requests->{$id}->[0]->get_input_handle() )
+        );
+        last SWITCH;
+      }
       $connection = POE::Component::Server::SimpleHTTP::Connection->new(
-         SSLify_GetSocket(
-            $_[HEAP]->{'REQUESTS'}->{$id}->[0]
-              ->[POE::Wheel::ReadWrite::HANDLE_INPUT]
-         )
+         $self->_requests->{$id}->[0]->get_input_handle()
       );
-   }
-   else {
-      $connection = POE::Component::Server::SimpleHTTP::Connection->new(
-         $_[HEAP]->{'REQUESTS'}->{$id}->[0]
-           ->[POE::Wheel::ReadWrite::HANDLE_INPUT] );
    }
 
    # The HTTP::Response object, the path
    my ( $response, $path, $malformed_req );
 
-# Check if it is HTTP::Request or Response
-# Quoting POE::Filter::HTTPD
-# The HTTPD filter parses the first HTTP 1.0 request from an incoming stream into an
-# HTTP::Request object (if the request is good) or an HTTP::Response object (if the
-# request was malformed).
-   if ( ref($request) eq 'HTTP::Response' ) {
+   # Check if it is HTTP::Request or Response
+   # Quoting POE::Filter::HTTPD
+   # The HTTPD filter parses the first HTTP 1.0 request from an incoming stream into an
+   # HTTP::Request object (if the request is good) or an HTTP::Response object (if the
+   # request was malformed).
 
+   if ( $request->isa('HTTP::Response') ) {
       # Make the request nothing
       $response = $request;
       $request  = undef;
@@ -807,7 +573,7 @@ sub Got_Input {
       # Mark that this is a malformed request
       $malformed_req = 1;
 
-# Hack it to simulate POE::Component::Server::SimpleHTTP::Response->new( $id, $conn );
+      # Hack it to simulate POE::Component::Server::SimpleHTTP::Response->new( $id, $conn );
       bless( $response, 'POE::Component::Server::SimpleHTTP::Response' );
       $response->_WHEEL( $id );
 
@@ -817,24 +583,21 @@ sub Got_Input {
       $path = '';
    }
    else {
-      unless ( $_[HEAP]->{'PROXYMODE'} ) {
-
+      unless ( $self->proxymode ) {
          # Add stuff it needs!
          my $uri = $request->uri;
          $uri->scheme('http');
-         $uri->host( $_[HEAP]->{'HOSTNAME'} );
-         $uri->port( $_[HEAP]->{'PORT'} );
+         $uri->host( $self->hostname );
+         $uri->port( $self->port );
 
          # Get the path
          $path = $uri->path();
          if ( !defined $path or $path eq '' ) {
-
             # Make it the default handler
             $path = '/';
          }
       }
       else {
-
          # We're in PROXYMODE set the path to the full URI
          $path = $request->uri->as_string();
       }
@@ -844,91 +607,81 @@ sub Got_Input {
         POE::Component::Server::SimpleHTTP::Response->new( $id, $connection );
 
       # Stuff the default headers
-      if ( keys( %{ $_[HEAP]->{'HEADERS'} } ) != 0 ) {
-         $response->header( %{ $_[HEAP]->{'HEADERS'} } );
-      }
+      $response->header( %{ $self->headers } )
+	if keys( %{ $self->headers } ) != 0;
    }
 
-# Check if the SimpleHTTP::Connection object croaked ( happens when sockets just disappear )
-   if ( !defined $response->connection ) {
-
+   # Check if the SimpleHTTP::Connection object croaked ( happens when sockets just disappear )
+   unless ( defined $response->connection ) {
       # Debug stuff
-      if (DEBUG) {
-         warn "could not make connection object";
-      }
-
+      warn "could not make connection object" if DEBUG;
       # Destroy this wheel!
-      delete $_[HEAP]->{'REQUESTS'}->{$id}->[0];
-      delete $_[HEAP]->{'REQUESTS'}->{$id};
-
-      # All done!
+      delete $self->_requests->{$id}->[0];
+      delete $self->_requests->{$id};
       return;
    }
-   else {
 
-      # If we used SSL, turn on the flag!
-      if ( defined $_[HEAP]->{'SSLKEYCERT'} ) {
-         $response->connection->ssl(1);
+   # If we used SSL, turn on the flag!
+   if ( $self->sslkeycert ) {
+      $response->connection->ssl(1);
 
-         # Put the cipher type for people who want it
-         $response->connection->sslcipher(
-           SSLify_GetCipher( $_[HEAP]->{'REQUESTS'}->{$id}->[0]
-              ->[POE::Wheel::ReadWrite::HANDLE_INPUT] ) );
-      }
+      # Put the cipher type for people who want it
+      $response->connection->sslcipher(
+           SSLify_GetCipher( $self->_requests->{$id}->[0]->get_input_handle() )
+      );
    }
 
    # Add this response to the wheel
-   $_[HEAP]->{'REQUESTS'}->{$id}->[2] = $response;
-   $_[HEAP]->{'REQUESTS'}->{$id}->[3] = $request;
+   $self->_requests->{$id}->[2] = $response;
+   $self->_requests->{$id}->[3] = $request;
    $response->connection->ID($id);
 
-# If they have a log handler registered, send out the needed information
-# TODO if we received a malformed request, we will not have a request object
-# We need to figure out what we're doing because they can't always expect to have
-# a request object, or should we keep it from being ?undef'd?
-   if ( $_[HEAP]->{'LOGHANDLER'} ) {
+   # If they have a log handler registered, send out the needed information
+   # TODO if we received a malformed request, we will not have a request object
+   # We need to figure out what we're doing because they can't always expect to have
+   # a request object, or should we keep it from being ?undef'd?
+
+   if ( $self->loghandler ) {
       $! = undef;
-      $_[KERNEL]->post(
-         $_[HEAP]->{'LOGHANDLER'}->{'SESSION'},
-         $_[HEAP]->{'LOGHANDLER'}->{'EVENT'},
+      $kernel->post(
+         $self->loghandler->{'SESSION'},
+         $self->loghandler->{'EVENT'},
          $request, $response->connection->remote_ip()
       );
 
       # Warn if we had a problem dispatching to the log handler above
       warn(
          "I had a problem posting to event '",
-         $_[HEAP]->{'LOGHANDLER'}->{'EVENT'},
+         $self->loghandler->{'EVENT'},
          "' of the log handler alias '",
-         $_[HEAP]->{'LOGHANDLE'}->{'SESSION'},
+         $self->loghandler->{'SESSION'},
 "'. As reported by Kernel: '$!', perhaps the alias is spelled incorrectly for this handler?"
       ) if $!;
    }
 
    # If we received a malformed request then
    # let's not try to dispatch to a handler
-   if ($malformed_req) {
 
-# Just push out the response we got from POE::Filter::HTTPD saying your request was bad
-      POE::Kernel->post(
-         $_[HEAP]->{ERRORHANDLER}->{SESSION},
-         $_[HEAP]->{ERRORHANDLER}->{EVENT},
+   if ($malformed_req) {
+      # Just push out the response we got from POE::Filter::HTTPD saying your request was bad
+      $kernel->post(
+         $self->errorhandler->{SESSION},
+         $self->errorhandler->{EVENT},
          'BadRequest (by POE::Filter::HTTPD)',
          $response->connection->remote_ip()
       );
-      $_[KERNEL]->yield( 'DONE', $response );
+      $kernel->yield( 'DONE', $response );
       return;
    }
-   else {
 
-      # Find which handler will handle this one
-      foreach my $handler ( @{ $_[HEAP]->{'HANDLERS'} } ) {
+   # Find which handler will handle this one
+   foreach my $handler ( @{ $self->handlers } ) {
 
-         # Check if this matches
-         if ( $path =~ $handler->{'RE'} ) {
+      # Check if this matches
+      if ( $path =~ $handler->{'RE'} ) {
 
-            # Send this off!
-            $_[KERNEL]
-              ->post( $handler->{'SESSION'}, $handler->{'EVENT'}, $request,
+          # Send this off!
+          $kernel->post( $handler->{'SESSION'}, $handler->{'EVENT'}, $request,
                $response, $handler->{'DIR'}, );
 
             # Make sure we croak if we have an issue posting
@@ -939,61 +692,52 @@ sub Got_Input {
 
             # All done!
             return;
-         }
       }
-
-      # If we reached here, no handler was able to handle it...
-      # Set response code to 404 and tell the client we didn't find anything
-      $response->code(404);
-      $response->content('404 Not Found');
-      $_[KERNEL]->yield( 'DONE', $response );
    }
+
+   # If we reached here, no handler was able to handle it...
+   # Set response code to 404 and tell the client we didn't find anything
+   $response->code(404);
+   $response->content('404 Not Found');
+   $kernel->yield( 'DONE', $response );
    return;
-}
+};
 
+# 'Got_Flush'
 # Finished with a request!
-sub Got_Flush {
-
-   # ARG0 = wheel ID
-   my $id = $_[ARG0];
+event 'got_flush' => sub {
+   my ($kernel,$self,$id) = @_[KERNEL,OBJECT,ARG0];
 
    # Debug stuff
-   if (DEBUG) {
-      warn "Got Flush event for wheel ID ( $id )";
-   }
+   warn "Got Flush event for wheel ID ( $id )" if DEBUG;
 
-   if ( $_[HEAP]->{'REQUESTS'}->{$id}->[1] == 2 ) {
-
+   if ( $self->_requests->{$id}->[1] == 2 ) {
       # Do the stream !
-      if (DEBUG) {
-         warn "Streaming in progress ...!";
-      }
+      warn "Streaming in progress ...!" if DEBUG;
       return;
    }
 
    # Check if we are shutting down
-   elsif ( $_[HEAP]->{'REQUESTS'}->{$id}->[1] == 1 ) {
+   if ( $self->_requests->{$id}->[1] == 1 ) {
 
-      if ( Must_KeepAlive( $_[HEAP], $id ) ) {
-         if (DEBUG) {
-            warn "Keep-alive id=$id ...";
-         }
-         $_[HEAP]->{'CONNECTIONS'}->{$id} = [
-            $_[HEAP]->{'REQUESTS'}->{$id}->[0],    # wheel
-            $_[HEAP]->{'REQUESTS'}->{$id}->[2]->connection
+      if ( $self->must_keepalive( $id ) ) {
+         warn "Keep-alive id=$id ..." if DEBUG;
+         $self->_connections->{$id} = [
+            $self->_requests->{$id}->[0],    # wheel
+            $self->_requests->{$id}->[2]->connection
          ];
       }
       else {
 
          # Shutdown read/write on the wheel
-         $_[HEAP]->{'REQUESTS'}->{$id}->[0]->shutdown_input();
-         $_[HEAP]->{'REQUESTS'}->{$id}->[0]->shutdown_output();
+         $self->_requests->{$id}->[0]->shutdown_input();
+         $self->_requests->{$id}->[0]->shutdown_output();
       }
 
       # Delete the wheel
       # Tracked down by Paul Visscher
-      delete $_[HEAP]->{'REQUESTS'}->{$id}->[0];
-      delete $_[HEAP]->{'REQUESTS'}->{$id};
+      delete $self->_requests->{$id}->[0];
+      delete $self->_requests->{$id};
    }
    else {
 
@@ -1005,30 +749,28 @@ sub Got_Flush {
    }
 
    # Alright, do we have to shutdown?
-   if ( !exists $_[HEAP]->{'SOCKETFACTORY'} ) {
-
+   unless ( $self->_factory ) {
       # Check to see if we have any more requests
-      if (   keys( %{ $_[HEAP]->{'REQUESTS'} } ) == 0
-         and keys( %{ $_[HEAP]->{'CONNECTIONS'} } ) == 0 )
+      if (   keys( %{ $self->_requests } ) == 0
+         and keys( %{ $self->_connections } ) == 0 )
       {
-
          # Shutdown!
-         $_[KERNEL]->yield('SHUTDOWN');
+         $kernel->yield('SHUTDOWN');
       }
    }
 
    # Success!
    return 1;
-}
+};
 
 # should we keep-alive the connection?
-sub Must_KeepAlive {
-   my ( $heap, $id ) = @_;
+sub must_keepalive {
+   my ( $self, $id ) = @_;
 
-   return unless $heap->{'KEEPALIVE'};
+   return unless $self->keepalive;
 
-   my $resp = $heap->{'REQUESTS'}->{$id}->[2];
-   my $req  = $heap->{'REQUESTS'}->{$id}->[3];
+   my $resp = $self->_requests->{$id}->[2];
+   my $req  = $self->_requests->{$id}->[3];
 
    # error = close
    return 0 if $resp->is_error;
@@ -1046,33 +788,31 @@ sub Must_KeepAlive {
    return 0;
 }
 
+# 'Got_Error'
 # Got some sort of error from ReadWrite
-sub Got_Error {
-
-   # ARG0 = operation, ARG1 = error number, ARG2 = error string, ARG3 = wheel ID
-   my ( $operation, $errnum, $errstr, $id ) = @_[ ARG0 .. ARG3 ];
+event 'got_error' => sub {
+   my ($kernel,$self,$operation,$errnum,$errstr,$id) = @_[KERNEL,OBJECT,ARG0..ARG3];
 
    # Only do this for non-EOF on read
    #unless ( $operation eq 'read' and $errnum == 0 ) {
    {
 
       # Debug stuff
-      if (DEBUG) {
-         warn "Wheel $id generated $operation error $errnum: $errstr\n";
-      }
+      warn "Wheel $id generated $operation error $errnum: $errstr\n"
+	if DEBUG;
 
       my $connection;
-      if ( $_[HEAP]->{'CONNECTIONS'}{$id} ) {
-         my $c = delete $_[HEAP]->{'CONNECTIONS'}{$id};
+      if ( $self->_connections->{$id} ) {
+         my $c = delete $self->_connections->{$id};
          $connection = $c->[1];
          delete $c->[0];
       }
       else {
-         $connection = $_[HEAP]->{'REQUESTS'}->{$id}->[2]->connection;
+         $connection = $self->_requests->{$id}->[2]->connection;
 
          # Delete this connection
-         delete $_[HEAP]->{'REQUESTS'}->{$id}->[0];
-         delete $_[HEAP]->{'REQUESTS'}->{$id};
+         delete $self->_requests->{$id}->[0];
+         delete $self->_requests->{$id};
       }
 
       # Mark the client dead
@@ -1081,39 +821,34 @@ sub Got_Error {
 
    # Success!
    return 1;
-}
+};
 
+# 'DONE'
 # Output to the client!
-sub Request_Output {
-
-   # ARG0 = HTTP::Response object
-   my ( $kernel, $response ) = @_[ KERNEL, ARG0 ];
+event 'DONE' => sub {
+   my ($kernel,$self,$response) = @_[KERNEL,OBJECT,ARG0];
 
    # Check if we got it
    if ( !defined $response or !UNIVERSAL::isa( $response, 'HTTP::Response' ) ) {
-      if (DEBUG) {
-         warn 'Did not get a HTTP::Response object!';
-      }
-
+      warn 'Did not get a HTTP::Response object!' if DEBUG;
       # Abort...
-      return undef;
+      return;
    }
 
    # Get the wheel ID
    my $id = $response->_WHEEL;
 
-# Check if the wheel exists ( sometimes it gets closed by the client, but the application doesn't know that... )
-   if ( !exists $_[HEAP]->{'REQUESTS'}->{$id} ) {
+   # Check if the wheel exists ( sometimes it gets closed by the client, but the application doesn't know that... )
+   unless ( exists $self->_requests->{$id} ) {
 
       # Debug stuff
-      if (DEBUG) {
-         warn
-'Wheel disappeared, but the application sent us a DONE event, discarding it';
-      }
+       warn
+         'Wheel disappeared, but the application sent us a DONE event, discarding it'
+  	    if DEBUG;
 
-      POE::Kernel->post(
-         $_[HEAP]->{ERRORHANDLER}->{SESSION},
-         $_[HEAP]->{ERRORHANDLER}->{EVENT},
+      $kernel->post(
+         $self->errorhandler->{SESSION},
+         $self->errorhandler->{EVENT},
          'Wheel disappeared !'
       );
 
@@ -1122,123 +857,106 @@ sub Request_Output {
    }
 
    # Check if we have already sent the response
-   if ( $_[HEAP]->{'REQUESTS'}->{$id}->[1] == 1 ) {
-
+   if ( $self->_requests->{$id}->[1] == 1 ) {
       # Tried to send twice!
       die 'Tried to send a response to the same connection twice!';
    }
 
    # Quick check to see if the wheel/socket died already...
    # Initially reported by Tim Wood
-   if (  !defined $_[HEAP]->{'REQUESTS'}->{$id}->[0]
-      or !
-      defined $_[HEAP]->{'REQUESTS'}->{$id}->[0]
-      ->[POE::Wheel::ReadWrite::HANDLE_INPUT] )
+   if (  !defined $self->_requests->{$id}->[0] or 
+      !defined $self->_requests->{$id}->[0]->get_input_handle() )
    {
-      if (DEBUG) {
-         warn 'Tried to send data over a closed/nonexistant socket!';
-      }
-      POE::Kernel->post(
-         $_[HEAP]->{ERRORHANDLER}->{SESSION},
-         $_[HEAP]->{ERRORHANDLER}->{EVENT},
+      warn 'Tried to send data over a closed/nonexistant socket!' if DEBUG;
+      $kernel->post(
+         $self->errorhandler->{SESSION},
+         $self->errorhandler->{EVENT},
          'Socket closed/nonexistant !'
       );
       return;
    }
 
-   Fix_Headers( $_[HEAP], $response );
+   $self->fix_headers( $response );
 
    # Send it out!
-   $_[HEAP]->{'REQUESTS'}->{$id}->[0]->put($response);
+   $self->_requests->{$id}->[0]->put($response);
 
    # Mark this socket done
-   $_[HEAP]->{'REQUESTS'}->{$id}->[1] = 1;
+   $self->_requests->{$id}->[1] = 1;
 
-# Log FINALLY If they have a logFinal handler registered, send out the needed information
-   if ( $_[HEAP]->{'LOG2HANDLER'} ) {
+   # Log FINALLY If they have a logFinal handler registered, send out the needed information
+   if ( $self->log2handler ) {
       $! = undef;
-      $_[KERNEL]->call(
-         $_[HEAP]->{'LOG2HANDLER'}->{'SESSION'},
-         $_[HEAP]->{'LOG2HANDLER'}->{'EVENT'},
-         $_[HEAP]->{'REQUESTS'}{$id}[3], $response
+      $kernel->call(
+         $self->log2handler->{'SESSION'},
+         $self->log2handler->{'EVENT'},
+         $self->_requests->{$id}[3], $response
       );
 
       # Warn if we had a problem dispatching to the log handler above
       warn(
          "I had a problem posting to event '",
-         $_[HEAP]->{'LOG2HANDLER'}->{'EVENT'},
+         $self->log2handler->{'EVENT'},
          "' of the log handler alias '",
-         $_[HEAP]->{'LOG2HANDLER'}->{'SESSION'},
+         $self->log2handler->{'SESSION'},
 "'. As reported by Kernel: '$!', perhaps the alias is spelled incorrectly for this handler?"
       ) if $!;
    }
 
    # Debug stuff
-   if (DEBUG) {
-      warn "Completed with Wheel ID $id";
-   }
+   warn "Completed with Wheel ID $id" if DEBUG;
 
    # Success!
    return 1;
-}
+};
 
+# 'STREAM'
 # Stream output to the client
-sub Stream_Output {
-
-   # ARG0 = HTTP::Response object
-   my ( $kernel, $response ) = @_[ KERNEL, ARG0 ];
+event 'STREAM' => sub {
+   my ($kernel,$self,$response) = @_[KERNEL,OBJECT,ARG0];
 
    # Check if we got it
-   if ( !defined $response or !UNIVERSAL::isa( $response, 'HTTP::Response' ) ) {
-      if (DEBUG) {
-         warn 'Did not get a HTTP::Response object!';
-      }
-
+   unless ( defined $response and UNIVERSAL::isa( $response, 'HTTP::Response' ) ) {
+      warn 'Did not get a HTTP::Response object!' if DEBUG;
       # Abort...
-      return undef;
+      return;
    }
 
    # Get the wheel ID
    my $id = $response->_WHEEL;
-   $_[HEAP]->{'CHUNKCOUNT'}->{$id}++;
+   $self->_chunkcount->{$id}++;
 
    if ( defined $response->STREAM ) {
 
       # Keep track if we plan to stream ...
-      if ( $_[HEAP]->{'RESPONSES'}->{$id} ) {
-         if (DEBUG) {
-            warn "Restoring response from HEAP and id $id ";
-         }
-         $response = $_[HEAP]->{'RESPONSES'}->{$id};
+      if ( $self->_responses->{$id} ) {
+         warn "Restoring response from HEAP and id $id " if DEBUG;
+         $response = $self->_responses->{$id};
       }
       else {
-         if (DEBUG) {
-            warn "Saving HEAP response to id $id ";
-         }
-         $_[HEAP]->{'RESPONSES'}->{$id} = $response;
+         warn "Saving HEAP response to id $id " if DEBUG;
+         $self->_responses->{$id} = $response;
       }
    }
    else {
-      if (DEBUG) {
-         warn
-           'Can\'t push on a response that has not been not set as a STREAM!';
-      }
-
+      warn
+        'Can\'t push on a response that has not been not set as a STREAM!'
+	   if DEBUG;
       # Abort...
-      return undef;
+      return;
    }
 
-# Check if the wheel exists ( sometimes it gets closed by the client, but the application doesn't know that... )
-   if ( !exists $_[HEAP]->{'REQUESTS'}->{$id} ) {
+   # Check if the wheel exists ( sometimes it gets closed by the client, but the application doesn't know that... )
+   unless ( exists $self->_requests->{$id} ) {
 
       # Debug stuff
-      if (DEBUG) {
-         warn
-'Wheel disappeared, but the application sent us a DONE event, discarding it';
-      }
-      POE::Kernel->post(
-         $_[HEAP]->{ERRORHANDLER}->{SESSION},
-         $_[HEAP]->{ERRORHANDLER}->{EVENT},
+       warn
+         'Wheel disappeared, but the application sent us a DONE event, discarding it'
+  	    if DEBUG;
+
+      $kernel->post(
+         $self->errorhandler->{SESSION},
+         $self->errorhandler->{EVENT},
          'Wheel disappeared !'
       );
 
@@ -1248,41 +966,25 @@ sub Stream_Output {
 
    # Quick check to see if the wheel/socket died already...
    # Initially reported by Tim Wood
-   if (  !defined $_[HEAP]->{'REQUESTS'}->{$id}->[0]
-      or !
-      defined $_[HEAP]->{'REQUESTS'}->{$id}->[0]
-      ->[POE::Wheel::ReadWrite::HANDLE_INPUT] )
+   if (  !defined $self->_requests->{$id}->[0] or 
+      !defined $self->_requests->{$id}->[0]->get_input_handle() )
    {
-      if (DEBUG) {
-         warn 'Tried to send data over a closed/nonexistant socket!';
-      }
-      POE::Kernel->post(
-         $_[HEAP]->{ERRORHANDLER}->{SESSION},
-         $_[HEAP]->{ERRORHANDLER}->{EVENT},
+      warn 'Tried to send data over a closed/nonexistant socket!' if DEBUG;
+      $kernel->post(
+         $self->errorhandler->{SESSION},
+         $self->errorhandler->{EVENT},
          'Socket closed/nonexistant !'
       );
       return;
    }
 
-   Fix_Headers( $_[HEAP], $response, 1 );
-
-   # Preliminary check
-   if (  !defined $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]
-      or !
-      defined $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]
-      ->[POE::Wheel::ReadWrite::HANDLE_INPUT] )
-   {
-      if (DEBUG) {
-         warn 'Tried to send data over a closed/nonexistant socket!';
-      }
-      next;
-   }
+   $self->fix_headers( $response, 1 );
 
    # Sets the correct POE::Filter
    unless ( defined $response->IS_STREAMING ) {
 
       # Mark this socket done
-      $_[HEAP]->{'REQUESTS'}->{$id}->[1] = 2;
+      $self->_requests->{$id}->[1] = 2;
 
       #
       $response->IS_STREAMING(1);
@@ -1295,35 +997,35 @@ sub Stream_Output {
         . " with id $id \n";
    }
 
-   if ( $_[HEAP]->{'CHUNKCOUNT'}->{$id} > 1 ) {
-      $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]
+   if ( $self->_chunkcount->{$id} > 1 ) {
+      $self->_requests->{ $response->_WHEEL }->[0]
         ->set_output_filter( POE::Filter::Stream->new() );
-      $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]
+      $self->_requests->{ $response->_WHEEL }->[0]
         ->put( $response->content );
    }
    else {
-      $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]
+      $self->_requests->{ $response->_WHEEL }->[0]
         ->set_output_filter( POE::Filter::HTTPD->new() );
-      $_[HEAP]->{'REQUESTS'}->{ $response->_WHEEL }->[0]->put($response);
+      $self->_requests->{ $response->_WHEEL }->[0]->put($response);
    }
 
    # we send the event to stream with wheels request and response to the session
    # that has registered the streaming event
    unless ( $response->DONT_FLUSH ) {
-      POE::Kernel->post(
+      $kernel->post(
          $response->STREAM_SESSION,    # callback session
          $response->STREAM,            # callback event
-         $_[HEAP]->{'RESPONSES'}->{ $response->_WHEEL }
+         $self->_responses->{ $response->_WHEEL }
       );
    }
 
    # Success!
    return 1;
-}
+};
 
 # Add required headers to a response
-sub Fix_Headers {
-   my ( $heap, $response, $stream ) = @_;
+sub fix_headers {
+   my ( $self, $response, $stream ) = @_;
 
    # Set the date if needed
    if ( !$response->header('Date') ) {
@@ -1331,7 +1033,7 @@ sub Fix_Headers {
    }
 
    # Set the Content-Length if needed
-   if (   !$stream and !$heap->{'PROXYMODE'}
+   if (   !$stream and !$self->proxymode
       and !defined $response->header('Content-Length')
       and my $len = length $response->content )
    {
@@ -1345,7 +1047,7 @@ sub Fix_Headers {
    }
 
    if ( !$response->protocol ) {
-      my $request = $heap->{'REQUESTS'}->{ $response->_WHEEL }->[3];
+      my $request = $self->_requests->{ $response->_WHEEL }->[3];
       return unless $request and $request->isa('HTTP::Request');
       unless ( $request->method eq 'HEAD' ) {
          $response->protocol( $request->protocol );
@@ -1353,91 +1055,74 @@ sub Fix_Headers {
    }
 }
 
+# 'CLOSE'
 # Closes the connection
-sub Request_Close {
-
-   # ARG0 = HTTP::Response object
-   my $response = $_[ARG0];
+event 'CLOSE' => sub {
+   my ($kernel,$self,$response) = @_[KERNEL,OBJECT,ARG0];
 
    # Check if we got it
-   if ( !defined $response or !UNIVERSAL::isa( $response, 'HTTP::Response' ) ) {
-      if (DEBUG) {
-         warn 'Did not get a HTTP::Response object!';
-      }
-
+   unless ( defined $response and UNIVERSAL::isa( $response, 'HTTP::Response' ) ) {
+      warn 'Did not get a HTTP::Response object!' if DEBUG;
       # Abort...
-      return undef;
+      return;
    }
 
    # Get the wheel ID
    my $id = $response->_WHEEL;
 
-   if ( $_[HEAP]->{'CONNECTIONS'}->{$id} ) {
-      my $c = delete $_[HEAP]->{'CONNECTIONS'}->{$id};
-      $_[HEAP]->{'REQUESTS'}->{$id} = [ $c->[0], 0, undef ];
+   if ( $self->_connections->{$id} ) {
+      my $c = delete $self->_connections->{$id};
+      $self->_requests->{$id} = [ $c->[0], 0, undef ];
    }
 
-# Check if the wheel exists ( sometimes it gets closed by the client, but the application doesn't know that... )
-   if ( !exists $_[HEAP]->{'REQUESTS'}->{$id} ) {
-
-      # Debug stuff
-      if (DEBUG) {
-         warn
-'Wheel disappeared, but the application sent us a CLOSE event, discarding it';
-      }
-
-      # All done!
+   # Check if the wheel exists ( sometimes it gets closed by the client, but the application doesn't know that... )
+   unless ( exists $self->_requests->{$id} ) {
+      warn
+        'Wheel disappeared, but the application sent us a CLOSE event, discarding it'
+	    if DEBUG;
       return 1;
    }
 
    # Kill it!
-   if (   defined $_[HEAP]->{'REQUESTS'}->{$id}->[0]
-      and defined $_[HEAP]->{'REQUESTS'}->{$id}->[0]
-      ->[POE::Wheel::ReadWrite::HANDLE_INPUT] )
-   {
-      $_[HEAP]->{'REQUESTS'}->{$id}->[0]->shutdown_input;
-      $_[HEAP]->{'REQUESTS'}->{$id}->[0]->shutdown_output;
+   if (   defined $self->_requests->{$id}->[0]
+      and defined $self->_requests->{$id}->[0]->get_input_handle() ) {
+      $self->_requests->{$id}->[0]->shutdown_input;
+      $self->_requests->{$id}->[0]->shutdown_output;
    }
 
    # Delete it!
-   delete $_[HEAP]->{'REQUESTS'}->{$id}->[0];
-   delete $_[HEAP]->{'REQUESTS'}->{$id};
-   delete $_[HEAP]->{'RESPONSES'}->{$id};
+   delete $self->_requests->{$id}->[0];
+   delete $self->_requests->{$id};
+   delete $self->_requests->{$id};
 
-   if (DEBUG) {
-      warn 'Delete references to the connection done.';
-   }
+   warn 'Delete references to the connection done.' if DEBUG;
 
    # All done!
    return 1;
-}
+};
 
 # Registers a POE inline state (primarly for streaming)
-sub Register {
+event 'REGISTER' => sub {
    my ( $session, $state, $code_ref ) = @_[ SESSION, ARG0 .. ARG1 ];
-
-   if (DEBUG) {
-      warn 'Registering state in POE session';
-   }
-
+   warn 'Registering state in POE session' if DEBUG;
    return $session->register_state( $state, $code_ref );
-}
+};
 
 # SETCLOSEHANDLER
-sub SetCloseHandler {
-   my ( $heap, $sender ) = @_[ HEAP, SENDER ];
-   my ( $connection, $state, @params ) = @_[ ARG0 .. $#_ ];
+event 'SETCLOSEHANDLER' => sub {
+   my ($self,$sender) = @_[OBJECT,SENDER ];
+   my ($connection,$state,@params) = @_[ARG0..$#_];
 
    # turn connection ID into the connection object
    unless ( ref $connection ) {
       my $id = $connection;
-      if ( $heap->{'CONNECTIONS'}->{$id} ) {
-         $connection = $heap->{'CONNECTIONS'}->{$id}->[1];
+      if ( $self->_connections->{$id} ) {
+         $connection = $self->_connections->{$id}->[1];
       }
-      elsif ($heap->{'REQUESTS'}->{$id}
-         and $heap->{'REQUESTS'}->{$id}->[2] )
+      elsif ($self->_requests->{$id}
+         and $self->_requests->{$id}->[2] )
       {
-         $connection = $_[HEAP]->{'REQUESTS'}->{$id}->[2]->connection;
+         $connection = $self->_requests->{$id}->[2]->connection;
       }
       unless ( ref $connection ) {
          die "Can't find connection object for request $id";
@@ -1445,15 +1130,18 @@ sub SetCloseHandler {
    }
 
    if ($state) {
-      $connection->_on_close( $sender, $state, @params );
+      $connection->_on_close( $sender->ID, $state, @params );
    }
    else {
-      $connection->_on_close($sender);
+      $connection->_on_close($sender->ID);
    }
-}
+};
 
-# End of module
-1;
+no MooseX::POE;
+
+__PACKAGE__->meta->make_immutable( );
+
+"Simple In'it";
 
 __END__
 
