@@ -11,7 +11,7 @@ use Moose;
 extends qw(HTTP::Response Moose::Object );
 
 has '_WHEEL' => (
-  is => 'ro',
+  is => 'rw',
 );
 
 has 'connection' => (

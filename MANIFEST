@@ -1,11 +1,14 @@
 Changes
 Changes.svn
+examples/proxy.pl
 examples/server.pl
 examples/stream.pl
 inc/Module/Install.pm
+inc/Module/Install/AutoLicense.pm
 inc/Module/Install/Base.pm
 inc/Module/Install/Can.pm
 inc/Module/Install/Fetch.pm
+inc/Module/Install/GithubMeta.pm
 inc/Module/Install/Makefile.pm
 inc/Module/Install/Metadata.pm
 inc/Module/Install/Win32.pm
@@ -14,6 +17,7 @@ lib/POE/Component/Server/SimpleHTTP.pm
 lib/POE/Component/Server/SimpleHTTP/Connection.pm
 lib/POE/Component/Server/SimpleHTTP/PreFork.pm
 lib/POE/Component/Server/SimpleHTTP/Response.pm
+LICENSE
 Makefile.PL
 MANIFEST			This list of files
 META.yml

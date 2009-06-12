@@ -91,21 +91,25 @@ has 'handlers' => (
 has 'errorhandler' => (
   is => 'ro',
   isa => 'HashRef',
+  default => sub {{}},
 );
 
 has 'loghandler' => (
   is => 'ro',
   isa => 'HashRef',
+  default => sub {{}},
 );
 
 has 'log2handler' => (
   is => 'ro',
   isa => 'HashRef',
+  default => sub {{}},
 );
 
 has 'setuphandler' => (
   is => 'ro',
   isa => 'HashRef',
+  default => sub {{}},
 );
 
 has 'retries' => (
@@ -858,6 +862,7 @@ event 'DONE' => sub {
       return 1;
    }
 
+
    # Check if we have already sent the response
    if ( $self->_requests->{$id}->[1] == 1 ) {
       # Tried to send twice!
@@ -877,6 +882,16 @@ event 'DONE' => sub {
       );
       return;
    }
+
+   # Check if we were streaming. 
+
+   if ( $self->_requests->{$id}->[1] == 2 ) {
+      # Need to tidy up the wheel
+      my $wheel = $self->_requests->{$id}->[0];
+      $wheel->set_output_filter( $wheel->get_input_filter );
+      return;
+   }
+   
 
    $self->fix_headers( $response );
 
