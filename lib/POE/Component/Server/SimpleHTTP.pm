@@ -485,7 +485,9 @@ event 'got_connection' => sub {
    # Set up the Wheel to read from the socket
    my $wheel = POE::Wheel::ReadWrite->new(
       Handle       => $socket,
-      Filter       => POE::Filter::HTTPD->new(),
+      Filter  => POE::Filter::HTTPD->new(),
+#      InputFilter  => POE::Filter::HTTPD->new(),
+#      OutputFilter => POE::Filter::HTTPD->new(),
       InputEvent   => 'got_input',
       FlushedEvent => 'got_flush',
       ErrorEvent   => 'got_error',
@@ -998,15 +1000,14 @@ event 'STREAM' => sub {
    }
 
    if ( $self->_chunkcount->{$id} > 1 ) {
-      $self->_requests->{ $response->_WHEEL }->[0]
-        ->set_output_filter( POE::Filter::Stream->new() );
-      $self->_requests->{ $response->_WHEEL }->[0]
-        ->put( $response->content );
+      my $wheel = $self->_requests->{ $response->_WHEEL }->[0];
+      $wheel->set_output_filter( POE::Filter::Stream->new() );
+      $wheel->put( $response->content );
    }
    else {
-      $self->_requests->{ $response->_WHEEL }->[0]
-        ->set_output_filter( POE::Filter::HTTPD->new() );
-      $self->_requests->{ $response->_WHEEL }->[0]->put($response);
+      my $wheel = $self->_requests->{ $response->_WHEEL }->[0];
+      $wheel->set_output_filter( $wheel->get_input_filter() );
+      $wheel->put($response);
    }
 
    # we send the event to stream with wheels request and response to the session
