@@ -333,7 +333,7 @@ event 'start_listener' => sub {
                $setuphandler->{'SESSION'},
                $setuphandler->{'EVENT'},
                $port, $address,
-	    );
+	    ) if $setuphandler->{'SESSION'} and $setuphandler->{'EVENT'};
          }
       }
    }
@@ -647,7 +647,7 @@ event 'got_input' => sub {
    # We need to figure out what we're doing because they can't always expect to have
    # a request object, or should we keep it from being ?undef'd?
 
-   if ( $self->loghandler ) {
+   if ( $self->loghandler and scalar keys %{ $self->loghandler } == 2 ) {
       $! = undef;
       $kernel->post(
          $self->loghandler->{'SESSION'},
@@ -675,7 +675,7 @@ event 'got_input' => sub {
          $self->errorhandler->{EVENT},
          'BadRequest (by POE::Filter::HTTPD)',
          $response->connection->remote_ip()
-      );
+      ) if $self->errorhandler and $self->errorhandler->{SESSION} and $self->errorhandler->{EVENT};
       $kernel->yield( 'DONE', $response );
       return;
    }
@@ -856,7 +856,7 @@ event 'DONE' => sub {
          $self->errorhandler->{SESSION},
          $self->errorhandler->{EVENT},
          'Wheel disappeared !'
-      );
+      ) if $self->errorhandler and $self->errorhandler->{SESSION} and $self->errorhandler->{EVENT};
 
       # All done!
       return 1;
@@ -879,7 +879,7 @@ event 'DONE' => sub {
          $self->errorhandler->{SESSION},
          $self->errorhandler->{EVENT},
          'Socket closed/nonexistant !'
-      );
+      ) if $self->errorhandler and $self->errorhandler->{SESSION} and $self->errorhandler->{EVENT};
       return;
    }
 
@@ -902,7 +902,7 @@ event 'DONE' => sub {
    $self->_requests->{$id}->[1] = 1;
 
    # Log FINALLY If they have a logFinal handler registered, send out the needed information
-   if ( $self->log2handler ) {
+   if ( $self->log2handler and scalar keys %{ $self->log2handler } == 2 ) {
       $! = undef;
       $kernel->call(
          $self->log2handler->{'SESSION'},
@@ -975,7 +975,7 @@ event 'STREAM' => sub {
          $self->errorhandler->{SESSION},
          $self->errorhandler->{EVENT},
          'Wheel disappeared !'
-      );
+      ) if $self->errorhandler and $self->errorhandler->{SESSION} and $self->errorhandler->{EVENT};
 
       # All done!
       return 1;
@@ -991,7 +991,7 @@ event 'STREAM' => sub {
          $self->errorhandler->{SESSION},
          $self->errorhandler->{EVENT},
          'Socket closed/nonexistant !'
-      );
+      ) if $self->errorhandler and $self->errorhandler->{SESSION} and $self->errorhandler->{EVENT};
       return;
    }
 
