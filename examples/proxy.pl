@@ -1,5 +1,6 @@
 use strict;
 use warnings;
+sub POE::Component::Server::SimpleHTTP::DEBUG () { 1 }
 use POE qw(Component::Client::HTTP Component::Server::SimpleHTTP);
 use POE::Component::Server::SimpleHTTP::Response;
 

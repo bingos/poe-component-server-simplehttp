@@ -26,6 +26,13 @@ has 'STREAM' => (
   is => 'rw',
 );
 
+has 'STREAM_DONE' => (
+  is => 'ro',
+  default => sub { 0 },
+  writer => 'set_stream_done',
+  init_arg => undef,
+);
+
 has 'IS_STREAMING' => (
   is => 'ro',
   writer => 'set_streaming',
