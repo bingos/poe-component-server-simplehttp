@@ -27,7 +27,8 @@ has 'STREAM' => (
 );
 
 has 'IS_STREAMING' => (
-  is => 'rw',
+  is => 'ro',
+  writer => 'set_streaming',
 );
 
 has 'DONT_FLUSH' => (

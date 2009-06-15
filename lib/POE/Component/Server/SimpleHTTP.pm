@@ -265,8 +265,8 @@ event 'SHUTDOWN' => sub {
    foreach my $S ( $self->_requests, $self->_connections ) {
       foreach my $conn ( keys %$S ) {
 
-   # Can't call method "shutdown_input" on an undefined value at
-   # /usr/lib/perl5/site_perl/5.8.2/POE/Component/Server/SimpleHTTP.pm line 323.
+         # Can't call method "shutdown_input" on an undefined value at
+         # /usr/lib/perl5/site_perl/5.8.2/POE/Component/Server/SimpleHTTP.pm line 323.
          if (   defined $S->{$conn}->[0]
             and defined $S->{$conn}->[0]->get_input_handle() )
          {
@@ -468,8 +468,6 @@ sub MassageHandlers {
 # The actual manager of connections
 event 'got_connection' => sub {
    my ($kernel,$self,$socket,$peeraddr,$peerport) = @_[KERNEL,OBJECT,ARG0..ARG2];
-   my $sockaddr = inet_ntoa( ( unpack_sockaddr_in ( CORE::getsockname $socket ) )[1] );
-   my $sockport = ( unpack_sockaddr_in ( CORE::getsockname $socket ) )[0];
 
 
    # Should we SSLify it?
@@ -490,8 +488,6 @@ event 'got_connection' => sub {
    my $wheel = POE::Wheel::ReadWrite->new(
       Handle       => $socket,
       Filter  => POE::Filter::HTTPD->new(),
-#      InputFilter  => POE::Filter::HTTPD->new(),
-#      OutputFilter => POE::Filter::HTTPD->new(),
       InputEvent   => 'got_input',
       FlushedEvent => 'got_flush',
       ErrorEvent   => 'got_error',
@@ -1004,7 +1000,7 @@ event 'STREAM' => sub {
       $self->_requests->{$id}->[1] = 2;
 
       #
-      $response->IS_STREAMING(1);
+      $response->set_streaming(1);
    }
 
    if (DEBUG) {
