@@ -189,12 +189,11 @@ sub BUILDARGS {
 }
 
 sub session_id {
-  return shift->get_session_id;
+  shift->get_session_id;
 }
 
 sub getsockname {
-   # This will need changing
-   $_[0]->{SOCKETFACTORY}->getsockname;
+  shift->_factory->getsockname;
 }
 
 sub shutdown {
@@ -202,7 +201,6 @@ sub shutdown {
    $poe_kernel->call( $self->get_session_id, 'SHUTDOWN', @_ );
 }
 
-# Refactor this probably will become STOP
 # This subroutine, when SimpleHTTP exits, will search for leaks
 sub STOP {
    my $self = $_[OBJECT];
@@ -521,6 +519,10 @@ event 'got_input' => sub {
    my ($kernel,$self,$request,$id) = @_[KERNEL,OBJECT,ARG0,ARG1];
    my $connection;
 
+   # This whole thing is a mess. Keep-Alive was bolted on and it
+   # shows. Streaming is unpredictable. There are checks everywhere
+   # because it leaks wheels. *sigh*
+
    # Was this request Keep-Alive?
    if ( $self->_connections->{$id} ) {
       my $state = delete $self->_connections->{$id};
@@ -533,9 +535,7 @@ event 'got_input' => sub {
 
    # Quick check to see if the socket died already...
    # Initially reported by Tim Wood
-   unless ( defined $self->_requests->{$id}->wheel and 
-      $self->_requests->{$id}->wheel->get_input_handle() ) {
-
+   unless ( $self->_requests->{$id}->wheel_alive ) {
       warn 'Got a request, but socket died already!' if DEBUG;
       # Destroy this wheel!
       $self->_requests->{$id}->close_wheel;
@@ -869,9 +869,7 @@ event 'DONE' => sub {
 
    # Quick check to see if the wheel/socket died already...
    # Initially reported by Tim Wood
-   if (  !defined $self->_requests->{$id}->wheel or 
-      !defined $self->_requests->{$id}->wheel->get_input_handle() )
-   {
+   unless ( $self->_requests->{$id}->wheel_alive ) {
       warn 'Tried to send data over a closed/nonexistant socket!' if DEBUG;
       $kernel->post(
          $self->errorhandler->{SESSION},
@@ -982,9 +980,7 @@ event 'STREAM' => sub {
 
    # Quick check to see if the wheel/socket died already...
    # Initially reported by Tim Wood
-   if (  !defined $self->_requests->{$id}->wheel or 
-      !defined $self->_requests->{$id}->wheel->get_input_handle() )
-   {
+   unless (  $self->_requests->{$id}->wheel_alive ) {
       warn 'Tried to send data over a closed/nonexistant socket!' if DEBUG;
       $kernel->post(
          $self->errorhandler->{SESSION},
@@ -1096,13 +1092,9 @@ event 'CLOSE' => sub {
    }
 
    # Kill it!
-   if (   defined $self->_requests->{$id}->wheel
-      and defined $self->_requests->{$id}->wheel->get_input_handle() ) {
-      $self->_requests->{$id}->close_wheel;
-   }
+   $self->_requests->{$id}->close_wheel if $self->_requests->{$id}->wheel_alive;
 
    # Delete it!
-   $self->_requests->{$id}->close_wheel;
    delete $self->_requests->{$id};
    delete $self->_responses->{$id};
 

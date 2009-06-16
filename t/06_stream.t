@@ -12,6 +12,7 @@ plan tests => 6;
 use HTTP::Request;
 use POE;
 use POE::Kernel;
+#sub POE::Component::Server::SimpleHTTP::DEBUG () { 1 }
 use POE::Component::Server::SimpleHTTP;
 
 my $PORT = 2080;

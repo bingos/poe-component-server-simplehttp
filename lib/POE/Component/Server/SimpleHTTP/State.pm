@@ -74,6 +74,14 @@ sub close_wheel {
   return 1;
 }
 
+sub wheel_alive {
+  my $self = shift;
+  return unless $self->has_wheel;
+  return unless defined $self->wheel;
+  return unless $self->wheel->get_input_handle();
+  return 1;
+}
+
 no Moose;
 
 __PACKAGE__->meta->make_immutable();
