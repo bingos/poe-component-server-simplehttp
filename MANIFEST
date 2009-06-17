@@ -17,6 +17,7 @@ lib/POE/Component/Server/SimpleHTTP.pm
 lib/POE/Component/Server/SimpleHTTP/Connection.pm
 lib/POE/Component/Server/SimpleHTTP/PreFork.pm
 lib/POE/Component/Server/SimpleHTTP/Response.pm
+lib/POE/Component/Server/SimpleHTTP/State.pm
 LICENSE
 Makefile.PL
 MANIFEST			This list of files

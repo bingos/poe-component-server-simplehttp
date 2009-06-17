@@ -9,6 +9,7 @@ use POE;
 use Carp qw( croak );
 use HTTP::Date qw( time2str );
 use IPC::Shareable qw( :lock );
+use POE::Component::Server::SimpleHTTP;
 
 # Set some constants
 BEGIN {
@@ -121,7 +122,7 @@ sub START {
 # 'SHUTDOWN'
 # Stops the server!
 event 'SHUTDOWN' => sub {
-   my ($kernel,$self,$graceful) = @_[KERNEL,OBJECT,ARG0];
+   my ($kernel,$self,$session,$graceful) = @_[KERNEL,OBJECT,SESSION,ARG0];
    # Shutdown the SocketFactory wheel
    $self->_clear_factory if $self->_factory;
 
@@ -129,27 +130,29 @@ event 'SHUTDOWN' => sub {
    warn 'Stopped listening for new connections!' 
      if POE::Component::Server::SimpleHTTP::DEBUG;
 
+   my $children;
+
    if ( $graceful ) {
       # Attempt to gracefully kill the children.
-      $children = $_[KERNEL]->call( $_[SESSION], 'KillChildren', 'TERM' );
+      $children = $kernel->call( $session, 'kill_children', 'TERM' );
 
       # Check for number of requests, and children.
-      if ( ( keys( %{ $_[HEAP]->{'REQUESTS'} } ) == 0 ) && ( $children == 0 ) )
-      {
+      if ( keys( %{ $self->_requests } ) == 0 and $children == 0 ) {
 
          # Alright, shutdown anyway
 
          # Delete our alias
-         $_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} );
+         $kernel->alias_remove( $_ ) for $kernel->alias_list();
+         $kernel->refcount_decrement( $self->get_session_id, __PACKAGE__ )
+           unless $self->alias;
 
          # Destroy all memory segments created by this process.
          IPC::Shareable->clean_up;
-         $_[HEAP]->{'SCOREBOARD'} = undef;
+         $self->wipe_scoreboard;
 
          # Debug stuff
-         if (POE::Component::Server::SimpleHTTP::DEBUG) {
-            warn 'Stopped SimpleHTTP gracefully, no requests left';
-         }
+         warn 'Stopped SimpleHTTP gracefully, no requests left'
+           if (POE::Component::Server::SimpleHTTP::DEBUG;
 
       }
 
@@ -158,59 +161,59 @@ event 'SHUTDOWN' => sub {
    }
 
    # CheckSpares need to know that we're shutting down
-   $_[HEAP]->{'SCOREBOARD'}->{'shutdown'} = 1;
+   $self->scoreboard->{'shutdown'} = 1;
 
    # Forcefully kill all the children.
-   $_[KERNEL]->call( $_[SESSION], 'KillChildren', 'KILL' );
+   $kernel->call( $session, 'kill_children', 'KILL' );
 
    # Forcibly close all sockets that are open
-   foreach my $conn ( keys %{ $_[HEAP]->{'REQUESTS'} } ) {
+   foreach my $S ( $self->_requests, $self->_connections ) {
+      foreach my $conn ( keys %$S ) {
 
-   # Can't call method "shutdown_input" on an undefined value at
-   # /usr/lib/perl5/site_perl/5.8.2/POE/Component/Server/SimpleHTTP.pm line 323.
-      if (   defined $_[HEAP]->{'REQUESTS'}->{$conn}->[0]
-         and defined $_[HEAP]->{'REQUESTS'}->{$conn}->[0]
-         ->[POE::Wheel::ReadWrite::HANDLE_INPUT] )
-      {
-         $_[HEAP]->{'REQUESTS'}->{$conn}->[0]->shutdown_input;
-         $_[HEAP]->{'REQUESTS'}->{$conn}->[0]->shutdown_output;
+         # Can't call method "shutdown_input" on an undefined value at
+         # /usr/lib/perl5/site_perl/5.8.2/POE/Component/Server/SimpleHTTP.pm line 323.
+         if (   defined $S->{$conn}->wheel
+            and defined $S->{$conn}->wheel->get_input_handle() )
+         {
+            $S->{$conn}->close_wheel;
+         }
+
+         # Delete this request
+         delete $S->{$conn};
       }
-
-      # Delete this request
-      delete $_[HEAP]->{'REQUESTS'}->{$conn};
    }
 
    # Remove any shared memory segments.
    IPC::Shareable->clean_up;
-   $_[HEAP]->{'SCOREBOARD'} = undef;
+   $self->wipe_scoreboard;
 
    # Delete our alias
-   $_[KERNEL]->alias_remove( $_[HEAP]->{'ALIAS'} );
+   $kernel->alias_remove( $_ ) for $kernel->alias_list();
+   $kernel->refcount_decrement( $self->get_session_id, __PACKAGE__ )
+      unless $self->alias;
 
-   # Debug stuff
-   if (POE::Component::Server::SimpleHTTP::DEBUG) {
-      warn 'Successfully stopped SimpleHTTP';
-   }
+
+   warn 'Successfully stopped SimpleHTTP'
+      if POE::Component::Server::SimpleHTTP::DEBUG;
 
    # Return success
    return 1;
 };
 
 # Kill all our children, and return the number we sent signals too.
-sub KillChildren {
-   my ( $heap, $sig ) = @_[ HEAP, ARG0 ];
-   my ( $children, $scoreboard, $mem ) = 0;
+event 'kill_children' => sub {
+   my ($kernel,$self,$sig) = @_[KERNEL,OBJECT,ARG0];
+   my ($children,$scoreboard,$mem) = 0;
 
    # By default, kill them nicely.
    $sig = 'TERM' unless defined $sig;
 
    # Make sure we are the parent AND preforked.
-   if ( $heap->{'ISCHILD'} == 0 ) {
-      if (POE::Component::Server::SimpleHTTP::DEBUG) {
-         warn "Killing children from $$ with signal $sig.";
-      }
+   unless ( $self->is_child ) {
+      warn "Killing children from $$ with signal $sig."
+         if POE::Component::Server::SimpleHTTP::DEBUG;
 
-      $scoreboard = $heap->{'SCOREBOARD'};
+      $scoreboard = $self->scoreboard;
       $mem        = tied %$scoreboard;
       if ( not defined $mem ) {
 
@@ -242,10 +245,10 @@ sub KillChildren {
    }
 
    #
-   $_[KERNEL]->delay_set('CheckSpares');
+   $kernel->delay_set('check_spares');
 
    return $children;
-}
+};
 
 # Sets up the SocketFactory wheel :)
 event 'start_listener' => sub {
@@ -416,7 +419,7 @@ event 'ISCHILD' => sub {
 
 # Check to see if we need a new spare.
 event 'check_spares' => sub {
-   my ($kernel,$self,$session) = @_[KERNEL,OBJECT,SESSION]
+   my ($kernel,$self,$session) = @_[KERNEL,OBJECT,SESSION];
    my ($scoreboard,$mem);
 
    # Make sure that we are not a child.
@@ -579,7 +582,7 @@ event '_sig_chld' => sub {
 
 # Someone is asking us to quit...
 event '_sig_term' => sub {
-   my ($kernel,$sig) = $_[KERNEL,ARG0];
+   my ($kernel,$sig) = @_[KERNEL,ARG0];
 
    warn "Caught signal ", $sig, " inside $$. Initiating graceful shutdown."
       if (POE::Component::Server::SimpleHTTP::DEBUG;
