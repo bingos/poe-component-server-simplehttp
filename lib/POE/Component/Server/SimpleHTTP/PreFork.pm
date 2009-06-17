@@ -6,6 +6,7 @@ use warnings;
 our $VERSION = '0.01';
 
 use POE;
+use Socket;
 use Carp qw( croak );
 use HTTP::Date qw( time2str );
 use IPC::Shareable qw( :lock );
@@ -45,8 +46,8 @@ has 'forkhandlers' => (
 
 has 'minspareservers' => (
   is => 'ro',
-  isa => subtype 'Int' => where { $_ > 0 },
   default => sub { 5 },
+  isa => subtype 'Int' => where { $_ > 0 },
 );
 
 # maxspareservers must be greater than minspareservers
@@ -70,8 +71,8 @@ has 'maxrequestperchild' => (
 # startservers must be greater than minspareservers
 has 'startservers' => (
   is => 'ro',
-  isa => subtype 'Int' => where { $_ > 0 },
   default => sub { 10 },
+  isa => subtype 'Int' => where { $_ > 0 },
 );
 
 has 'scoreboard' => (
@@ -112,9 +113,9 @@ sub BUILDARGS {
 }
 
 sub START {
-  my ($kernel,$self) = @_[KERNEL,OBJECT];
-  $kernel->sig( TERM => '_sig_term' );
-  $kernel->sig( CHLD => '_sig_chld' );
+  my $self = shift;
+  $poe_kernel->sig( TERM => '_sig_term' );
+  $poe_kernel->sig( CHLD => '_sig_chld' );
   $self->SUPER::START(@_);
   return;
 }
@@ -252,7 +253,7 @@ event 'kill_children' => sub {
 
 # Sets up the SocketFactory wheel :)
 event 'start_listener' => sub {
-   my ($kernel,$self) = @_[KERNEL,OBJECT];
+   my ($kernel,$self,$noinc) = @_[KERNEL,OBJECT,ARG0];
 
    warn 'Creating SocketFactory wheel now'
     if POE::Component::Server::SimpleHTTP::DEBUG;
@@ -264,9 +265,9 @@ event 'start_listener' => sub {
    }
 
    # Check if we should set up the wheel
-   if ( $self->retries == MAX_RETRIES ) {
+   if ( $self->retries == POE::Component::Server::SimpleHTTP::MAX_RETRIES ) {
       die 'POE::Component::Server::SimpleHTTP tried '
-        . MAX_RETRIES
+        . POE::Component::Server::SimpleHTTP::MAX_RETRIES
         . ' times to create a Wheel and is giving up...';
    }
    else {
@@ -542,7 +543,7 @@ event 'show_scoreboard' => sub {
 
 # A child died :(
 event '_sig_chld' => sub {
-   my ($kernel,$heap,$pid) = @_[KERNEL,OBJECT,ARG1];
+   my ($kernel,$self,$pid) = @_[KERNEL,OBJECT,ARG1];
    my ($scoreboard,$mem,$children);
 
    # Check to see if we are in preforked mode and the parent.
@@ -694,6 +695,7 @@ event 'STOPLISTEN' => sub {
       $kernel->call( $session, 'kill_children', 'TERM' );
 
       # Call the super class method.
+      shift;
       return $self->SUPER::STOPLISTEN(@_);
    }
 };
@@ -719,6 +721,7 @@ event 'STARTLISTEN' => sub {
    else {
 
       # We are the parent. Truly start listening again.
+      shift;
       return $self->SUPER::STARTLISTEN(@_);
    }
 };
@@ -734,6 +737,7 @@ event 'SETHANDLERS' => sub {
    }
 
    # Call the super class method.
+   shift;
    return $self->SUPER::SETHANDLERS(@_);
 };
 
@@ -784,6 +788,7 @@ event 'GETFORKHANDLERS' => sub {
 # The actual manager of connections
 event 'got_connection' => sub {
    my ($kernel,$self) = @_[KERNEL,OBJECT];
+   shift;
    $self->SUPER::got_connection(@_);
    # Update the scoreboard.
    $kernel->call( $_[SESSION], 'UpdateScoreboard' );
@@ -794,6 +799,7 @@ event 'got_connection' => sub {
 event 'got_input' => sub {
    my ($kernel,$self,$id) = @_[KERNEL,OBJECT,ARG1];
    # Call the super class method.
+   shift;
    my $rv = $self->SUPER::got_input(@_);
    # If the connection died/failed for some reason then the request is deleted.
    # In this case, we have to update the scoreboard.
@@ -807,6 +813,7 @@ event 'got_flush' => sub {
    my ($kernel,$self,$id) = @_[KERNEL,OBJECT,ARG0];
 
    # Call the super class method.
+   shift;
    my $rv = $self->SUPER::got_flush(@_);
 
    # Deal with maxrequestperchild
@@ -833,6 +840,7 @@ event 'got_flush' => sub {
 event 'got_error' => sub {
    my ($kernel,$self) = @_[KERNEL,OBJECT];
    # Call the super class method.
+   next;
    my $rv = $self->SUPER::got_error(@_);
    # The connection was probably cleared, so update the scoreboard.
    $kernel->call( $_[SESSION], 'update_scoreboard' );
@@ -846,7 +854,7 @@ event 'CLOSE' => sub {
    # The connection was probably cleared, so update the scoreboard.
    $poe_kernel->call( $_[SESSION], 'update_scoreboard' );
    return $rv;
-}
+};
 
 # End of module
 1;
