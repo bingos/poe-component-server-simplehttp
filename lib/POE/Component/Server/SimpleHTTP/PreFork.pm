@@ -113,10 +113,8 @@ sub BUILDARGS {
 }
 
 sub START {
-  my $self = shift;
   $poe_kernel->sig( TERM => '_sig_term' );
   $poe_kernel->sig( CHLD => '_sig_chld' );
-  $self->SUPER::START(@_);
   return;
 }
 
