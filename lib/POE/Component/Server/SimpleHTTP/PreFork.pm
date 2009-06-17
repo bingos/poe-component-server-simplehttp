@@ -152,7 +152,7 @@ event 'SHUTDOWN' => sub {
 
          # Debug stuff
          warn 'Stopped SimpleHTTP gracefully, no requests left'
-           if (POE::Component::Server::SimpleHTTP::DEBUG;
+           if POE::Component::Server::SimpleHTTP::DEBUG;
 
       }
 
@@ -585,7 +585,7 @@ event '_sig_term' => sub {
    my ($kernel,$sig) = @_[KERNEL,ARG0];
 
    warn "Caught signal ", $sig, " inside $$. Initiating graceful shutdown."
-      if (POE::Component::Server::SimpleHTTP::DEBUG;
+      if POE::Component::Server::SimpleHTTP::DEBUG;
 
    # Shutdown gracefully, and tell POE we handled the signal.
    $kernel->yield( 'SHUTDOWN', 'GRACEFUL' );
@@ -772,7 +772,7 @@ event 'GETFORKHANDLERS' => sub {
    # Make a deep copy of the handlers
    require Storable;
 
-   my $handlers = Storable::dclone( $self->forkhandlers} );
+   my $handlers = Storable::dclone( $self->forkhandlers );
 
    # All done!
    $kernel->post( $session, $event, $handlers );
