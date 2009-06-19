@@ -191,56 +191,6 @@ event 'SHUTDOWN' => sub {
    return 1;
 };
 
-# Kill all our children, and return the number we sent signals too.
-event 'kill_children' => sub {
-   my ($kernel,$self,$sig) = @_[KERNEL,OBJECT,ARG0];
-   my ($children,$scoreboard,$mem) = 0;
-
-   # By default, kill them nicely.
-   $sig = 'TERM' unless defined $sig;
-
-   # Make sure we are the parent AND preforked.
-   unless ( $self->is_child ) {
-      warn "Killing children from $$ with signal $sig."
-         if POE::Component::Server::SimpleHTTP::DEBUG;
-
-      $scoreboard = $self->scoreboard;
-      $mem        = tied %$scoreboard;
-      if ( not defined $mem ) {
-
-         # There was an error, but there's nothing we can do,
-         # so just exit.
-         warn "Parent's SCOREBOARD is not tied!";
-         $children = 0;
-      }
-      else {
-
-         # Get a count of the number of children, and start killing them
-         $mem->shlock(LOCK_SH);
-
-         # The children haven't already received a signal, so send them one.
-         foreach my $pid ( keys %$scoreboard ) {
-            if ( ( $pid ne 'actives' ) && ( $pid ne 'spares' ) ) {
-               ++$children;
-               kill $sig, $pid;
-            }
-         }
-         $mem->shlock(LOCK_UN);
-
-         # Check to make sure it is sane.
-         if ( $children < 0 ) {
-            warn "The child count is negative: $children.";
-            $children = 0;
-         }
-      }
-   }
-
-   #
-   $kernel->delay_set('check_spares');
-
-   return $children;
-};
-
 # Sets up the SocketFactory wheel :)
 event 'start_listener' => sub {
    my ($kernel,$self,$noinc) = @_[KERNEL,OBJECT,ARG0];
@@ -306,6 +256,149 @@ event 'start_listener' => sub {
    }
 
    return 1;
+};
+
+# Stops listening on the socket
+event 'STOPLISTEN' => sub {
+   my ($kernel,$self,$session) = @_[KERNEL,OBJECT,SESSION];
+   
+   if ( $self->is_child ) {
+
+      # If we are the child then we shouldn't really stop listening.
+      # Instead, pause accepting on our SocketFactory.
+      unless (  $self->_factory ) {
+         warn "Cannot StopListen on a non-existant SOCKETFACTORY in child $$";
+         return 0;
+      }
+      else {
+
+         # Pause accepting.
+         $self->_factory->pause_accept();
+         return 1;
+      }
+   }
+   else {
+
+      # We are in the parent, so truly stop listening.
+      # Kill the children because they are still listenning.
+      $kernel->call( $session, 'kill_children', 'TERM' );
+
+      # Call the super class method.
+      shift;
+      return $self->SUPER::STOPLISTEN(@_);
+   }
+};
+
+event 'STARTLISTEN' => sub {
+   my ($kernel,$self) = @_[KERNEL,OBJECT];
+   
+   if ( $self->is_child ) {
+
+      # If we are the child then we can't really create a new SOCKETFACTORY.
+      # Instead, we can resume accepting on our current SOCKETFACTORY.
+      unless (  $self->_factory ) {
+         warn "Cannot StartListen on a non-existant SOCKETFACTORY in child $$";
+         return 0;
+      }
+      else {
+
+         # Resume accepting.
+         $self->_factory->resume_accept();
+         return 1;
+      }
+   }
+   else {
+
+      # We are the parent. Truly start listening again.
+      shift;
+      return $self->SUPER::STARTLISTEN(@_);
+   }
+};
+
+# Sets the HANDLERS
+event 'SETHANDLERS' => sub {
+  my $self = $_[OBJECT];
+
+  # Setting handlers in a child makes little sense, so abort if this is the case
+   if ( $self->is_child ) {
+      warn "Child $$ tried to set the handlers for SimpleHTTP.";
+      return 0;
+   }
+
+   # Call the super class method.
+   shift;
+   return $self->SUPER::SETHANDLERS(@_);
+};
+
+# The actual manager of connections
+event 'got_connection' => sub {
+   my ($kernel,$self) = @_[KERNEL,OBJECT];
+   shift;
+   $self->SUPER::got_connection(@_);
+   # Update the scoreboard.
+   $kernel->call( $_[SESSION], 'UpdateScoreboard' );
+   return 1;
+};
+
+# Finally got input, set some stuff and send away!
+event 'got_input' => sub {
+   my ($kernel,$self,$id) = @_[KERNEL,OBJECT,ARG1];
+   # Call the super class method.
+   shift;
+   my $rv = $self->SUPER::got_input(@_);
+   # If the connection died/failed for some reason then the request is deleted.
+   # In this case, we have to update the scoreboard.
+   $kernel->call( $_[SESSION], 'UpdateScoreboard' )
+      unless exists $self->_requests->{$id};
+   return $rv;
+};
+
+# Finished with a request!
+event 'got_flush' => sub {
+   my ($kernel,$self,$id) = @_[KERNEL,OBJECT,ARG0];
+
+   # Call the super class method.
+   shift;
+   my $rv = $self->SUPER::got_flush(@_);
+
+   # Deal with maxrequestperchild
+   if ( $self->is_child and defined $self->maxrequestperchild ) {
+      $self->inc_reqcount;
+
+      if ( $self->reqcount >= $self->maxrequestperchild) {
+         warn "Shutting down $$ because it reached MAXREQUESTPERCHILD."
+            if POE::Component::Server::SimpleHTTP::DEBUG;
+
+         $kernel->yield( 'SHUTDOWN', 'GRACEFUL' );
+         return 1;
+      }
+   }
+
+   # If the connection died/failed for some reason then the request is deleted.
+   # In this case, we have to update the scoreboard.
+   $kernel->call( $_[SESSION], 'update_scoreboard' )
+      unless exists $self->_requests->{$id};
+   return $rv;
+};
+
+# Got some sort of error from ReadWrite
+event 'got_error' => sub {
+   my ($kernel,$self) = @_[KERNEL,OBJECT];
+   # Call the super class method.
+   next;
+   my $rv = $self->SUPER::got_error(@_);
+   # The connection was probably cleared, so update the scoreboard.
+   $kernel->call( $_[SESSION], 'update_scoreboard' );
+   return $rv;
+};
+
+# Closes the connection
+event 'CLOSE' => sub {
+   # Call the super class method.
+   my $rv = POE::Component::Server::SimpleHTTP::Request_Close(@_);
+   # The connection was probably cleared, so update the scoreboard.
+   $poe_kernel->call( $_[SESSION], 'update_scoreboard' );
+   return $rv;
 };
 
 # PreFork the initial instances.
@@ -406,6 +499,100 @@ event 'prefork' => sub {
 # True if this is a child.
 event 'ISCHILD' => sub {
    return $_[OBJECT]->is_child;
+};
+
+# Kill all our children, and return the number we sent signals too.
+event 'kill_children' => sub {
+   my ($kernel,$self,$sig) = @_[KERNEL,OBJECT,ARG0];
+   my ($children,$scoreboard,$mem) = 0;
+
+   # By default, kill them nicely.
+   $sig = 'TERM' unless defined $sig;
+
+   # Make sure we are the parent AND preforked.
+   unless ( $self->is_child ) {
+      warn "Killing children from $$ with signal $sig."
+         if POE::Component::Server::SimpleHTTP::DEBUG;
+
+      $scoreboard = $self->scoreboard;
+      $mem        = tied %$scoreboard;
+      if ( not defined $mem ) {
+
+         # There was an error, but there's nothing we can do,
+         # so just exit.
+         warn "Parent's SCOREBOARD is not tied!";
+         $children = 0;
+      }
+      else {
+
+         # Get a count of the number of children, and start killing them
+         $mem->shlock(LOCK_SH);
+
+         # The children haven't already received a signal, so send them one.
+         foreach my $pid ( keys %$scoreboard ) {
+            if ( ( $pid ne 'actives' ) && ( $pid ne 'spares' ) ) {
+               ++$children;
+               kill $sig, $pid;
+            }
+         }
+         $mem->shlock(LOCK_UN);
+
+         # Check to make sure it is sane.
+         if ( $children < 0 ) {
+            warn "The child count is negative: $children.";
+            $children = 0;
+         }
+      }
+   }
+
+   #
+   $kernel->delay_set('check_spares');
+
+   return $children;
+};
+
+# Sets the FORKHANDLERS
+event 'SETFORKHANDLERS' => sub {
+   # ARG0 = ref to handlers hash
+   my ($self,$handlers) = @_[OBJECT,ARG0];
+
+   # Setting handlers in a child makes little sense, so abort if this is the case.
+   if ( $self->is_child ) {
+      warn "Child $$ tried to set the handlers for SimpleHTTP.";
+      return 0;
+   }
+
+   # Validate it...
+   unless ( defined $handlers and ref $handlers eq 'HASH' ) {
+      warn "FORKHANDLERS is not in the proper format.";
+      return 0;
+   }
+
+   # If we got here, passed tests!
+   $self->set_forkhandlers( $handlers );
+
+   # All done!
+   return 1;
+};
+
+# Gets the FORKHANDLERS
+event 'GETFORKHANDLERS' => sub {
+   # ARG0 = session, ARG1 = event
+   my ($kernel,$self,$session,$event) = @_[KERNEL,OBJECT,ARG0,ARG1];
+
+   # Validation
+   return undef unless defined $session and defined $event;
+
+   # Make a deep copy of the handlers
+   require Storable;
+
+   my $handlers = Storable::dclone( $self->forkhandlers );
+
+   # All done!
+   $kernel->post( $session, $event, $handlers );
+
+   # All done!
+   return 1;
 };
 
 # Check to see if we need a new spare.
@@ -657,193 +844,6 @@ event 'update_scoreboard' => sub {
    }
 
    return 1;
-};
-
-# Stops listening on the socket
-event 'STOPLISTEN' => sub {
-   my ($kernel,$self,$session) = @_[KERNEL,OBJECT,SESSION];
-   
-   if ( $self->is_child ) {
-
-      # If we are the child then we shouldn't really stop listening.
-      # Instead, pause accepting on our SocketFactory.
-      unless (  $self->_factory ) {
-         warn "Cannot StopListen on a non-existant SOCKETFACTORY in child $$";
-         return 0;
-      }
-      else {
-
-         # Pause accepting.
-         $self->_factory->pause_accept();
-         return 1;
-      }
-   }
-   else {
-
-      # We are in the parent, so truly stop listening.
-      # Kill the children because they are still listenning.
-      $kernel->call( $session, 'kill_children', 'TERM' );
-
-      # Call the super class method.
-      shift;
-      return $self->SUPER::STOPLISTEN(@_);
-   }
-};
-
-event 'STARTLISTEN' => sub {
-   my ($kernel,$self) = @_[KERNEL,OBJECT];
-   
-   if ( $self->is_child ) {
-
-      # If we are the child then we can't really create a new SOCKETFACTORY.
-      # Instead, we can resume accepting on our current SOCKETFACTORY.
-      unless (  $self->_factory ) {
-         warn "Cannot StartListen on a non-existant SOCKETFACTORY in child $$";
-         return 0;
-      }
-      else {
-
-         # Resume accepting.
-         $self->_factory->resume_accept();
-         return 1;
-      }
-   }
-   else {
-
-      # We are the parent. Truly start listening again.
-      shift;
-      return $self->SUPER::STARTLISTEN(@_);
-   }
-};
-
-# Sets the HANDLERS
-event 'SETHANDLERS' => sub {
-  my $self = $_[OBJECT];
-
-  # Setting handlers in a child makes little sense, so abort if this is the case
-   if ( $self->is_child ) {
-      warn "Child $$ tried to set the handlers for SimpleHTTP.";
-      return 0;
-   }
-
-   # Call the super class method.
-   shift;
-   return $self->SUPER::SETHANDLERS(@_);
-};
-
-# Sets the FORKHANDLERS
-event 'SETFORKHANDLERS' => sub {
-   # ARG0 = ref to handlers hash
-   my ($self,$handlers) = @_[OBJECT,ARG0];
-
-   # Setting handlers in a child makes little sense, so abort if this is the case.
-   if ( $self->is_child ) {
-      warn "Child $$ tried to set the handlers for SimpleHTTP.";
-      return 0;
-   }
-
-   # Validate it...
-   unless ( defined $handlers and ref $handlers eq 'HASH' ) {
-      warn "FORKHANDLERS is not in the proper format.";
-      return 0;
-   }
-
-   # If we got here, passed tests!
-   $self->set_forkhandlers( $handlers );
-
-   # All done!
-   return 1;
-};
-
-# Gets the FORKHANDLERS
-event 'GETFORKHANDLERS' => sub {
-   # ARG0 = session, ARG1 = event
-   my ($kernel,$self,$session,$event) = @_[KERNEL,OBJECT,ARG0,ARG1];
-
-   # Validation
-   return undef unless defined $session and defined $event;
-
-   # Make a deep copy of the handlers
-   require Storable;
-
-   my $handlers = Storable::dclone( $self->forkhandlers );
-
-   # All done!
-   $kernel->post( $session, $event, $handlers );
-
-   # All done!
-   return 1;
-};
-
-# The actual manager of connections
-event 'got_connection' => sub {
-   my ($kernel,$self) = @_[KERNEL,OBJECT];
-   shift;
-   $self->SUPER::got_connection(@_);
-   # Update the scoreboard.
-   $kernel->call( $_[SESSION], 'UpdateScoreboard' );
-   return 1;
-};
-
-# Finally got input, set some stuff and send away!
-event 'got_input' => sub {
-   my ($kernel,$self,$id) = @_[KERNEL,OBJECT,ARG1];
-   # Call the super class method.
-   shift;
-   my $rv = $self->SUPER::got_input(@_);
-   # If the connection died/failed for some reason then the request is deleted.
-   # In this case, we have to update the scoreboard.
-   $kernel->call( $_[SESSION], 'UpdateScoreboard' )
-      unless exists $self->_requests->{$id};
-   return $rv;
-};
-
-# Finished with a request!
-event 'got_flush' => sub {
-   my ($kernel,$self,$id) = @_[KERNEL,OBJECT,ARG0];
-
-   # Call the super class method.
-   shift;
-   my $rv = $self->SUPER::got_flush(@_);
-
-   # Deal with maxrequestperchild
-   if ( $self->is_child and defined $self->maxrequestperchild ) {
-      $self->inc_reqcount;
-
-      if ( $self->reqcount >= $self->maxrequestperchild) {
-         warn "Shutting down $$ because it reached MAXREQUESTPERCHILD."
-            if POE::Component::Server::SimpleHTTP::DEBUG;
-
-         $kernel->yield( 'SHUTDOWN', 'GRACEFUL' );
-         return 1;
-      }
-   }
-
-   # If the connection died/failed for some reason then the request is deleted.
-   # In this case, we have to update the scoreboard.
-   $kernel->call( $_[SESSION], 'update_scoreboard' )
-      unless exists $self->_requests->{$id};
-   return $rv;
-};
-
-# Got some sort of error from ReadWrite
-event 'got_error' => sub {
-   my ($kernel,$self) = @_[KERNEL,OBJECT];
-   # Call the super class method.
-   next;
-   my $rv = $self->SUPER::got_error(@_);
-   # The connection was probably cleared, so update the scoreboard.
-   $kernel->call( $_[SESSION], 'update_scoreboard' );
-   return $rv;
-};
-
-# Closes the connection
-event 'CLOSE' => sub {
-   # Call the super class method.
-   my $rv = POE::Component::Server::SimpleHTTP::Request_Close(@_);
-   # The connection was probably cleared, so update the scoreboard.
-   $poe_kernel->call( $_[SESSION], 'update_scoreboard' );
-   return $rv;
 };
 
 no MooseX::POE;
