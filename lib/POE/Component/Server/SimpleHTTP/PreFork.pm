@@ -104,15 +104,8 @@ has 'reqcount' => (
   },
 );
 
-# This is probably redundant
-sub BUILDARGS {
-  my $class = shift;
-  my %args = @_;
-  $args{lc $_} = delete $args{$_} for keys %args;
-  return $class->SUPER::BUILDARGS(%args);
-}
-
 sub START {
+  warn "START got called in PreFork\n";
   $poe_kernel->sig( TERM => '_sig_term' );
   $poe_kernel->sig( CHLD => '_sig_chld' );
   return;

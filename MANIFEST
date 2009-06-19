@@ -1,5 +1,6 @@
 Changes
 Changes.svn
+examples/prefork.pl
 examples/proxy.pl
 examples/server.pl
 examples/stream.pl
