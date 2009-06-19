@@ -56,7 +56,6 @@ has 'streaming' => (
 
 sub reset {
   my $self = shift;
-  warn "Resetting the connection\n";
   $self->clear_response;
   $self->clear_request;
   $self->set_streaming(0);

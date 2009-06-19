@@ -220,7 +220,6 @@ sub STOP {
 
 sub START {
   my ($kernel,$self) = @_[KERNEL,OBJECT];
-  warn "START got called in SimpleHTTP\n";
   $kernel->alias_set( $self->alias ) if $self->alias;
   $kernel->refcount_increment( $self->get_session_id, __PACKAGE__ )
 	unless $self->alias;

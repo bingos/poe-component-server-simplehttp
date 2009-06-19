@@ -105,7 +105,6 @@ has 'reqcount' => (
 );
 
 sub START {
-  warn "START got called in PreFork\n";
   $poe_kernel->sig( TERM => '_sig_term' );
   $poe_kernel->sig( CHLD => '_sig_chld' );
   return;
