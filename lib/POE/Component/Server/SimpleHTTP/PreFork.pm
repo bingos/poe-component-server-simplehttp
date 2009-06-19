@@ -3,7 +3,7 @@ package POE::Component::Server::SimpleHTTP::PreFork;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '1.99_01';
 
 use POE;
 use Socket;
@@ -846,6 +846,10 @@ event 'CLOSE' => sub {
    $poe_kernel->call( $_[SESSION], 'update_scoreboard' );
    return $rv;
 };
+
+no MooseX::POE;
+
+__PACKAGE__->meta->make_immutable;
 
 # End of module
 1;
