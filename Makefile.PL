@@ -37,18 +37,6 @@ $value = prompt( 'Do you want SSL support ( requires POE::Component::SSLify ) [y
 # Add to the prereqs PoCo::SSLify?
 requires 'POE::Component::SSLify' => '0.04' if $value =~ /^Y$/i;
 
-# Ask users if they want PreFork support
-$value = prompt( 'Do you want PreFork support ( requires IPC::Shareable ) [y/N]?', 'N' );
-
-# Add to the prereqs IPC::Shareable?
-if ( $value =~ /^Y$/i ) {
-   requires 'IPC::Shareable' => '0';
-   build_requires   'POE::Component::Client::HTTP' => 0.82;
-}
-
-# Sanity check
-build_requires 'POE::Component::Client::HTTP' => 0.82 if can_use 'IPC::Shareable';
-
 # Thanks to Matt Trout for this tip
 #makemaker_args(dist => { PREOP => "$^X ./tools/svn-log.perl > ./Changes" });
 makemaker_args(dist => { PREOP => "git --no-pager log --tags > ./Changes" });
