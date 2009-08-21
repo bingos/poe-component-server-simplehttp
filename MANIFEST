@@ -16,7 +16,6 @@ inc/Module/Install/Win32.pm
 inc/Module/Install/WriteAll.pm
 lib/POE/Component/Server/SimpleHTTP.pm
 lib/POE/Component/Server/SimpleHTTP/Connection.pm
-lib/POE/Component/Server/SimpleHTTP/PreFork.pm
 lib/POE/Component/Server/SimpleHTTP/Response.pm
 lib/POE/Component/Server/SimpleHTTP/State.pm
 LICENSE
@@ -32,7 +31,5 @@ t/04_run_close.t
 t/04_run_keepalive.t
 t/05_post.t
 t/06_stream.t
-t/09_prefork_maxrequestperchild.t
-t/10_prefork_stream.t
 t/99_pod.t
 t/99_pod_coverage.t

@@ -1,3 +1,153 @@
+commit b42a9a28f21a5f010a372903aaa92fe0a3e56466
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Tue Jul 7 16:11:32 2009 +0100
+
+    Bump version for a CPAN release
+
+commit 85d1e4c81fd4426f0af5168c2a8b91c6090e5d0c
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Fri Jun 19 16:58:45 2009 +0100
+
+    Moved around the event handlers in PreFork
+
+commit aa853233329a161c1538009238d10c2a7d945167
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Fri Jun 19 14:07:06 2009 +0100
+
+    Removed some debugging warnings
+
+commit abd283a873b0f7e44f1604a3ceb488b7435637ab
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Fri Jun 19 14:01:15 2009 +0100
+
+    Added no MooseX::POE and make_immutable to PreFork.
+
+commit 537fd7c1d803d7fdb8b4c4ba36df21d87ebe63a8
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Fri Jun 19 13:25:02 2009 +0100
+
+    Added some debug code.
+
+commit 5bb1c987daa6ab1b61f06d5c4ca5e3e6713d6a9e
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Wed Jun 17 11:36:36 2009 +0100
+
+    Worked out that START events are called top down.
+
+commit 12cf3f7f4fdce841057b8db7a3e48d7b48377095
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Wed Jun 17 10:38:28 2009 +0100
+
+    Added prefork example
+
+commit 0262174071f5b05a6006417d7b7a315d1449074c
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Wed Jun 17 10:10:37 2009 +0100
+
+    Some more PreFork fixes, mainly with the SUPER calls
+
+commit c5dee2f3b20150c3db71f36dd1e38de15bba465e
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Wed Jun 17 09:46:44 2009 +0100
+
+    More PreFork fixes.
+
+commit 568e31352fcc88ed6ac76f53b90a2d7b9b0aa2e2
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Wed Jun 17 09:37:36 2009 +0100
+
+    More PreFork refactoring.
+
+commit e07e0083f0011e36bb9a6ee5eb18aa09f3428502
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Wed Jun 17 00:24:26 2009 +0100
+
+    Refactored big chunks of code including PreFork \o/
+
+commit 79c8bc3d039ecdb09a757d25ac951aeb97c46a16
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Mon Jun 15 14:50:45 2009 +0100
+
+    Getting there with the refactoring, but coming to the conclusion that the internal logic is like a dog's breakfast
+
+commit 2687b868eb109ba4c990d29c5414221baf172dfd
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Mon Jun 15 10:23:01 2009 +0100
+
+    Minor changes prior to refactoring the streaming support
+
+commit 4315e0aa346043fe6829d2fce4bd714d72de684d
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Fri Jun 12 11:10:20 2009 +0100
+
+    Resolved annoying warnings.
+
+commit 693a5e2581eabbd6a6d29fea6ea64245ab5cc90e
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Fri Jun 12 10:54:22 2009 +0100
+
+    Bump version for a development CPAN release
+
+commit 9415836496521ef98258adc6cc9d3b00babd5bea
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Fri Jun 12 10:41:21 2009 +0100
+
+    Add meta to Makefile.PL, debug issues with the streaming.
+
+commit ac3f3fee754f6275a615f2d4021257335f0c0202
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Fri Jun 12 09:09:53 2009 +0100
+
+    Minor changes to filters and the streaming code
+
+commit 389dc427c3ce393cde2d80f8908f74156a220d84
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Thu Jun 11 23:42:44 2009 +0100
+
+    Refactored to use MooseX::POE
+
+commit a4888173e26c1a80119ad0b9e8500dcc16cfddd9
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Tue Jun 9 12:58:41 2009 +0100
+
+    Moosified the fake HTTP::Response object. Tracked down usage in main module and fixed.
+
+commit 55a252278184b9ce8e1c3980a7ac78f15e5fbe20
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Tue Jun 9 00:11:42 2009 +0100
+
+    Moosified the connection object
+
+commit 452b83f62ed92ffb6cc692529ac8c167db363ea2
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Mon Jun 8 22:01:28 2009 +0100
+
+    Fixes for running in PROXYMODE
+
+commit 0e1767b44efe1af343720589dcaf537d89858ff5
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Sat Mar 14 17:01:20 2009 +0000
+
+    Blank Changes file ready for git log output
+
+commit 87d5ee0186e07fddeb1eb64c12ae7b5dcdfc7338
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Sat Mar 14 17:00:28 2009 +0000
+
+    Moved old svn Changes file to Changes.svn. Updated dist PREOP to run git log
+
+commit 1da3bf7af568eebeccec2b67994cbf726aa544c2
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Sat Mar 14 15:53:17 2009 +0000
+
+    Removed the svn-log.perl script no longer required now on git
+
+commit 93fc97493c6d990e0e1594d191c588f98cee79c7
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Sat Mar 14 15:47:08 2009 +0000
+
+    Fixed problem with socket closing. Reported by Sean Pieper [RT #44111] but also addresses [RT #27120]
+
 commit e718e3c467f7a0b41e0089bd842e6342eb4d7e3d
 Author: Chris Williams <chris@bingosnet.co.uk>
 Date:   Mon Mar 9 23:39:43 2009 +0000
