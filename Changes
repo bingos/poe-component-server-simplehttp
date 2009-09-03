@@ -1,3 +1,15 @@
+commit e12d35c425eba7866fdc6a96728d74e476531af8
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Fri Aug 21 16:08:58 2009 +0100
+
+    Prepare for a CPAN development release
+
+commit f090b426eaa4e16357507d344b595744e61d44a5
+Author: Chris Williams <chris@bingosnet.co.uk>
+Date:   Fri Aug 21 16:03:33 2009 +0100
+
+    Removed PreFork subclass and tests. It will have its own distribution from now on.
+
 commit b42a9a28f21a5f010a372903aaa92fe0a3e56466
 Author: Chris Williams <chris@bingosnet.co.uk>
 Date:   Tue Jul 7 16:11:32 2009 +0100
