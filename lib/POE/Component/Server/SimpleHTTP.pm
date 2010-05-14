@@ -5,7 +5,7 @@ use warnings;
 
 use vars qw($VERSION);
 
-$VERSION = '2.0';
+$VERSION = '2.2';
 
 use POE;
 use POE::Wheel::SocketFactory;
@@ -582,7 +582,7 @@ event 'got_input' => sub {
       bless( $response, 'POE::Component::Server::SimpleHTTP::Response' );
       $response->_WHEEL( $id );
 
-      $response->connection( $connection );
+      $response->set_connection( $connection );
 
       # Set the path to an empty string
       $path = '';
@@ -801,7 +801,7 @@ event 'got_error' => sub {
 
       # Debug stuff
       warn "Wheel $id generated $operation error $errnum: $errstr\n"
-	if DEBUG;
+	      if DEBUG;
 
       my $connection;
       if ( $self->_connections->{$id} ) {
@@ -810,7 +810,13 @@ event 'got_error' => sub {
          $c->close_wheel;
       }
       else {
-         $connection = $self->_requests->{$id}->response->connection;
+
+         if( defined $self->_requests->{$id}->response ) {
+            $connection = $self->_requests->{$id}->response->connection;
+         }   
+         else {
+            warn "response for $id is undefined" if DEBUG;
+         }
 
          # Delete this connection
          $self->_requests->{$id}->close_wheel;

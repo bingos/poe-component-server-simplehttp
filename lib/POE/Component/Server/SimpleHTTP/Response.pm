@@ -3,7 +3,7 @@ package POE::Component::Server::SimpleHTTP::Response;
 use strict;
 use warnings;
 
-our $VERSION = '2.0';
+our $VERSION = '2.2';
 
 use base qw( HTTP::Response );
 
@@ -16,6 +16,7 @@ has '_WHEEL' => (
 
 has 'connection' => (
   is => 'ro',
+  writer => 'set_connection',
 );
 
 has 'STREAM_SESSION' => (

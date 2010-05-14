@@ -38,8 +38,7 @@ $value = prompt( 'Do you want SSL support ( requires POE::Component::SSLify ) [y
 requires 'POE::Component::SSLify' => '0.04' if $value =~ /^Y$/i;
 
 # Thanks to Matt Trout for this tip
-#makemaker_args(dist => { PREOP => "$^X ./tools/svn-log.perl > ./Changes" });
-makemaker_args(dist => { PREOP => "git --no-pager log --tags > ./Changes" });
+makemaker_args(dist => { PREOP => "$^X tools/git-log.pl > ./Changes" });
 
 auto_provides;
 githubmeta;
