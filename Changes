@@ -1,4 +1,27 @@
 ==============================
+2010-05-19 11:30:49 +0100 2.04
+==============================
+
+  commit 962ff9855c25fbe08f02579d6021a1f25e764561
+  Author: Chris 'BinGOs' Williams <chris@bingosnet.co.uk>
+  Date:   Wed May 19 11:30:49 2010 +0100
+  
+    Bump to version 2.04
+
+  commit 596632447b8f0450b1cd031af33e7daf78c57c4d
+  Author: Markus Jansen <markus.jansen@ericsson.com>
+  Date:   Wed May 19 11:12:10 2010 +0100
+  
+    Patch applied from Markus Jansen which adds 'sslintermediatecacert'
+    option.
+
+  commit 5ab8239c11b6093a076eabae9c5be68ecba41a03
+  Author: Chris 'BinGOs' Williams <chris@bingosnet.co.uk>
+  Date:   Fri May 14 13:13:08 2010 +0100
+  
+    Fix the versions 
+
+==============================
 2010-05-14 13:07:50 +0100 2.02
 ==============================
 
