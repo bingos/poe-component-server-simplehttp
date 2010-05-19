@@ -5,7 +5,7 @@ use warnings;
 
 use vars qw($VERSION);
 
-$VERSION = '2.02';
+$VERSION = '2.02_01';
 
 use POE;
 use POE::Wheel::SocketFactory;
@@ -74,6 +74,11 @@ has 'keepalive' => (
 has 'sslkeycert' => (
   is => 'ro',
   isa => subtype 'ArrayRef' => where { scalar @$_ == 2 },
+);
+
+has 'sslintermediatecacert' => (
+  is => 'ro',
+  isa => 'Str',
 );
 
 has 'headers' => (
@@ -176,12 +181,18 @@ sub BUILDARGS {
      eval {
        require POE::Component::SSLify;
        import POE::Component::SSLify
-         qw( SSLify_Options SSLify_GetSocket Server_SSLify SSLify_GetCipher );
+         qw( SSLify_Options SSLify_GetSocket Server_SSLify SSLify_GetCipher SSLify_GetCTX );
        SSLify_Options( @{ $args{sslkeycert} } );
      };
      if ($@) {
         warn "Unable to load PoCo::SSLify -> $@" if DEBUG;
 	delete $args{sslkeycert};
+     }
+     else {
+	if ( $args{sslintermediatecacert} ) {
+	  my $ctx = SSLify_GetCTX();
+	  Net::SSLeay::CTX_load_verify_locations($ctx, $args{sslintermediatecacert}, '');
+	}
      }
   }
 
@@ -1200,7 +1211,8 @@ POE::Component::Server::SimpleHTTP - Perl extension to serve HTTP requests in PO
 		},
 
 		# In the testing phase...
-		'SSLKEYCERT'	=>	[ 'public-key.pem', 'public-cert.pem' ],
+		'SSLKEYCERT'	=>	[ 'private-key.pem', 'public-cert.pem' ],
+		'SSLINTERMEDIATECACERT'	=>	'intermediate-ca-cert.pem',
 	) or die 'Unable to create the HTTP Server';
 
 	# Create our own session to receive events from SimpleHTTP
@@ -1468,10 +1480,14 @@ Currently there are no parameters returned.
 
 =item C<SSLKEYCERT>
 
-This should be an arrayref of only 2 elements - the public key and certificate location. Now, this is still in the experimental stage, and testing
+This should be an arrayref of only 2 elements - the private key and public certificate locations. Now, this is still in the experimental stage, and testing
 is greatly welcome!
 
 Again, this will automatically turn every incoming connection into a SSL socket. Once enough testing has been done, this option will be augmented with more SSL stuff!
+
+=item C<SSLINTERMEDIATECACERT>
+
+This option is needed in case the SSL certificate references an intermediate certification authority certificate.
 
 =item C<PROXYMODE>
 
