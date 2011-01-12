@@ -1,4 +1,31 @@
 ==============================
+2010-12-03 23:50:53 +0000 2.06
+==============================
+
+  commit 022177b74b1baa9af4420583a399faea60489251
+  Author: Chris 'BinGOs' Williams <chris@bingosnet.co.uk>
+  Date:   Fri Dec 3 23:50:53 2010 +0000
+  
+    Bump version
+
+  commit 061fb63b793ebef311ed3436878e2886956dfd1a
+  Author: donor.com <donor@cpan.org>
+  Date:   Fri Dec 3 23:48:26 2010 +0000
+  
+    RT #63575 Crash in LOG2HANDLER
+
+    With a LOG2HANDLER, dies is DONE event handler. Fix is to use method
+    call rather than array de-reference.
+
+    Signed-off-by: Chris 'BinGOs' Williams <chris@bingosnet.co.uk>
+
+  commit ba403870437ffa02bc16e2b6b357568c752093a7
+  Author: Chris 'BinGOs' Williams <chris@bingosnet.co.uk>
+  Date:   Wed May 19 12:04:08 2010 +0100
+  
+    Sync changes 
+
+==============================
 2010-05-19 11:30:49 +0100 2.04
 ==============================
 
