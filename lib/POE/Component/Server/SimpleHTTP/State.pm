@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use POE::Wheel::ReadWrite;
 
-our $VERSION = '2.06';
+our $VERSION = '2.08';
 
 use Moose;
 

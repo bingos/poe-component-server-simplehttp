@@ -5,7 +5,7 @@ use warnings;
 
 use vars qw($VERSION);
 
-$VERSION = '2.06';
+$VERSION = '2.08';
 
 use POE;
 use POE::Wheel::SocketFactory;
