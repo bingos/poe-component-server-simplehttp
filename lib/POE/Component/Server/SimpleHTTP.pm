@@ -744,6 +744,8 @@ event 'got_flush' => sub {
 	 $state->set_connection( $state->response->connection );
 	 $state->reset;
          $self->_connections->{$id} = $state;
+         delete $self->_chunkcount->{$id};
+         delete $self->_responses->{$id};
       }
       else {
          # Shutdown read/write on the wheel
