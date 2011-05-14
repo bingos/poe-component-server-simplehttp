@@ -902,7 +902,9 @@ event 'DONE' => sub {
       $self->_requests->{$id}->set_streaming(0);
       $self->_requests->{$id}->set_done(1); # Finished streaming
       # TODO: We might not get a flush, trigger it ourselves.
-      $kernel->yield( 'got_flush', $id );
+      if ( !$self->_requests->{$id}->wheel->get_driver_out_messages ) {
+         $kernel->yield( 'got_flush', $id );
+      }
       return;
    }
    
