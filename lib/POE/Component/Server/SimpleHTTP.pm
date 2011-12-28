@@ -647,6 +647,12 @@ event 'got_input' => sub {
       );
    }
 
+   if ( !defined( $request ) ) {
+      $self->_requests->{$id}->close_wheel;
+      delete $self->_requests->{$id};
+      return;
+   }
+
    # Add this response to the wheel
    $self->_requests->{$id}->set_response( $response );
    $self->_requests->{$id}->set_request( $request );
