@@ -3,7 +3,7 @@ package POE::Component::Server::SimpleHTTP::Response;
 use strict;
 use warnings;
 
-our $VERSION = '2.14';
+our $VERSION = '2.16';
 
 use base qw( HTTP::Response );
 
