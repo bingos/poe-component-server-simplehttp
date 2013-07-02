@@ -36,7 +36,6 @@ BEGIN {
 }
 
 use MooseX::POE;
-use MooseX::AttributeHelpers;
 use Moose::Util::TypeConstraints;
 
 
@@ -48,7 +47,7 @@ has 'address' => (
   is => 'ro',
 );
 
-has 'port' => ( 
+has 'port' => (
   is => 'ro',
   default => sub { 0 },
   writer => '_set_port',
@@ -119,14 +118,14 @@ has 'setuphandler' => (
 );
 
 has 'retries' => (
-  metaclass => 'Counter',
+  traits  => ['Counter'],
   is        => 'ro',
   isa       => 'Num',
   default   => sub { 0 },
-  provides  => {
-    inc => 'inc_retry',
-    dec => 'dec_retry',          
-    reset => 'reset_retries',
+  handles   => {
+    inc_retry     => 'inc',
+    dec_retry     => 'dec',
+    reset_retries => 'reset',
   },
 );
 
@@ -176,7 +175,7 @@ sub BUILDARGS {
   $args{lc $_} = delete $args{$_} for keys %args;
 
   if ( $args{sslkeycert} and ref $args{sslkeycert} eq 'ARRAY'
-	and scalar @{ $args{sslkeycert} } == 2 ) {  
+	and scalar @{ $args{sslkeycert} } == 2 ) {
 
      eval {
        require POE::Component::SSLify;
