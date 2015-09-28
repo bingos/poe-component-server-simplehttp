@@ -3,9 +3,15 @@ POE/Component/Server/SimpleHTTP
 
 INSTALLATION
 
+You will need first to have (or install):
+
+    Module::Install
+    Module::Install::AutoLicense
+    Module::Install::GithubMeta
+
 To install this module type the following:
 
-   perl Makefile.PL
+   perl Makefile.PL # then install prerequisites
    make
    make test
    make install
