@@ -1450,7 +1450,7 @@ ARG1 -> the IP address of the client
 
 =item C<LOG2HANDLER>
 
-Expect a hashref with the following key, valyes:
+Expect a hashref with the following key, values:
 
 SESSION	->	The session to send the input
 
@@ -1615,7 +1615,7 @@ $response to a streaming state and once you trigger it:
    # send a CLOSE event to the kernel with the appropriate response as parameter
    $kernel->yield('GOT_STREAM', $response);
 
-The optionnal dont_flush option gives the user the ability to control the callback
+The optional dont_flush option gives the user the ability to control the callback
 to the streaming event, which means once your stream event has reached its end
 it won't be called, you have to call it back.
 
@@ -1637,7 +1637,7 @@ shutdown when your streaming is done (EOF for example).
       #
       # $kernel->delay('GOT_STREAM', 1, $stream );
 
-      # otherwise the GOT_STREAM event is triggered continously until
+      # otherwise the GOT_STREAM event is triggered continuously until
       # we call the CLOSE event on the response like that :
       #
       if ($heap{'streaming_is_done'}) {
