@@ -4,7 +4,7 @@ package POE::Component::Server::SimpleHTTP::Connection;
 use strict;
 use warnings;
 
-our $VERSION = '2.18';
+our $VERSION = '2.20';
 
 use Socket qw( inet_ntoa unpack_sockaddr_in );
 use POE;
