@@ -252,8 +252,10 @@ event 'SHUTDOWN' => sub {
    # Are we gracefully shutting down or not?
    if ( $graceful ) {
 
-      # Check for number of requests
-      if ( keys( %{ $self->_requests } ) == 0 ) {
+      # Check for existing requests and keep-alive connections
+      if ( keys( %{ $self->_requests } ) == 0
+         and keys( %{ $self->_connections } ) == 0 )
+      {
 
          # Alright, shutdown anyway
 
