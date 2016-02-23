@@ -798,11 +798,11 @@ sub must_keepalive {
    return 0 if $resp->is_error;
 
    # Connection is a comma-seperated header
-   my $conn = lc $req->header('Connection');
+   my $conn = lc ($req->header('Connection') || '');
    return 0 if ",$conn," =~ /,\s*close\s*,/;
-   $conn = lc $req->header('Proxy-Connection');
+   $conn = lc ($req->header('Proxy-Connection') || '');
    return 0 if ",$conn," =~ /,\s*close\s*,/;
-   $conn = lc $resp->header('Connection');
+   $conn = lc ($resp->header('Connection') || '');
    return 0 if ",$conn," =~ /,\s*close\s*,/;
 
    # HTTP/1.1 = keep
