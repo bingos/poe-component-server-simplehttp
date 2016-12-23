@@ -665,8 +665,7 @@ event 'got_input' => sub {
    # a request object, or should we keep it from being ?undef'd?
 
    if ( $self->loghandler and scalar keys %{ $self->loghandler } == 2 ) {
-      $! = undef;
-      $kernel->post(
+      my $ok = $kernel->post(
          $self->loghandler->{'SESSION'},
          $self->loghandler->{'EVENT'},
          $request, $response->connection->remote_ip()
@@ -679,7 +678,7 @@ event 'got_input' => sub {
          "' of the log handler alias '",
          $self->loghandler->{'SESSION'},
 "'. As reported by Kernel: '$!', perhaps the alias is spelled incorrectly for this handler?"
-      ) if $!;
+      ) unless $ok;
    }
 
    # If we received a malformed request then
@@ -704,14 +703,14 @@ event 'got_input' => sub {
       if ( $path =~ $handler->{'RE'} ) {
 
           # Send this off!
-          $kernel->post( $handler->{'SESSION'}, $handler->{'EVENT'}, $request,
+          my $ok = $kernel->post( $handler->{'SESSION'}, $handler->{'EVENT'}, $request,
                $response, $handler->{'DIR'}, );
 
             # Make sure we croak if we have an issue posting
             croak(
 "I had a problem posting to event $handler->{'EVENT'} of session $handler->{'SESSION'} for DIR handler '$handler->{'DIR'}'",
 ". As reported by Kernel: '$!', perhaps the session name is spelled incorrectly for this handler?"
-            ) if $!;
+            ) unless $ok;
 
             # All done!
             return;
