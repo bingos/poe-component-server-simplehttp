@@ -1,4 +1,5 @@
 #use ExtUtils::MakeMaker;
+use if ! ( grep { $_ eq '.' } @INC ), qw[lib .];
 use inc::Module::Install;
 
 $ENV{PERL_MM_USE_DEFAULT}=1 if $Module::Install::AUTHOR;
