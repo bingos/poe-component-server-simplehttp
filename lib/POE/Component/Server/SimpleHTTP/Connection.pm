@@ -1,10 +1,10 @@
 # Declare our package
 package POE::Component::Server::SimpleHTTP::Connection;
 
+#ABSTRACT: Stores connection information for SimpleHTTP
+
 use strict;
 use warnings;
-
-our $VERSION = '2.24';
 
 use Socket qw( inet_ntoa unpack_sockaddr_in );
 use POE;
@@ -112,11 +112,11 @@ __PACKAGE__->meta->make_immutable;
 # End of module
 1;
 
-__END__
+=pod
 
-=head1 NAME
+=for Pod::Coverage DEMOLISH
 
-POE::Component::Server::SimpleHTTP::Connection - Stores connection information for SimpleHTTP
+=cut
 
 =head1 SYNOPSIS
 
@@ -153,18 +153,5 @@ Nothing.
 
 L<POE::Component::Server::SimpleHTTP>,
 L<POE::Component::Server::SimpleHTTP::Response>
-
-=head1 AUTHOR
-
-Apocalypse E<lt>apocal@cpan.orgE<gt>
-
-Chris C<BinGOs> Williams <chris@bingosnet.co.uk>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright E<copy> Apocalypse and Chris Williams
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
 
 =cut

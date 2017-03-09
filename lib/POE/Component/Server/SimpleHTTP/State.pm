@@ -4,11 +4,9 @@ use strict;
 use warnings;
 use POE::Wheel::ReadWrite;
 
-our $VERSION = '2.24';
-
 use Moose;
 
-has 'wheel' => ( 
+has 'wheel' => (
   is => 'ro',
   isa => 'POE::Wheel::ReadWrite',
   clearer => 'clear_wheel',
@@ -88,3 +86,15 @@ __PACKAGE__->meta->make_immutable();
 'This monkey has gone to heaven';
 
 __END__
+
+=pod
+
+=begin Pod::Coverage
+
+       close_wheel
+       reset
+       wheel_alive
+
+=end Pod::Coverage
+
+=cut

@@ -1,11 +1,9 @@
 package POE::Component::Server::SimpleHTTP;
 
+#ABSTRACT: Perl extension to serve HTTP requests in POE.
+
 use strict;
 use warnings;
-
-use vars qw($VERSION);
-
-$VERSION = '2.24';
 
 use POE;
 use POE::Wheel::SocketFactory;
@@ -1174,11 +1172,20 @@ __PACKAGE__->meta->make_immutable( );
 
 "Simple In'it";
 
-__END__
+=pod
 
-=head1 NAME
+=begin Pod::Coverage
 
-POE::Component::Server::SimpleHTTP - Perl extension to serve HTTP requests in POE.
+       MassageHandlers
+       START
+       STOP
+       fix_headers
+       getsockname
+       must_keepalive
+       session_id
+       shutdown
+
+=end Pod::Coverage
 
 =head1 SYNOPSIS
 
@@ -1711,16 +1718,5 @@ Nothing.
 	L<POE::Component::Server::SimpleHTTP::PreFork>
 
 	L<POE::Component::SSLify>
-
-=head1 AUTHOR
-
-Apocalypse E<lt>apocal@cpan.orgE<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright 2006 by Apocalypse
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
 
 =cut

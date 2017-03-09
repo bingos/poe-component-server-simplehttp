@@ -1,9 +1,9 @@
 package POE::Component::Server::SimpleHTTP::Response;
 
+#ABSTRACT: Emulates a HTTP::Response object, used for SimpleHTTP
+
 use strict;
 use warnings;
-
-our $VERSION = '2.24';
 
 use base qw( HTTP::Response );
 
@@ -90,11 +90,11 @@ __PACKAGE__->meta->make_immutable( inline_constructor => 0 );
 # End of module
 1;
 
-__END__
+=pod
 
-=head1 NAME
+=for Pod::Coverage stream
 
-POE::Component::Server::SimpleHTTP::Response - Emulates a HTTP::Response object, used for SimpleHTTP
+=cut
 
 =head1 SYNOPSIS
 
@@ -118,16 +118,5 @@ Nothing.
 	L<POE::Component::Server::SimpleHTTP>
 
 	L<POE::Component::Server::SimpleHTTP::Connection>
-
-=head1 AUTHOR
-
-Apocalypse E<lt>apocal@cpan.orgE<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright 2006 by Apocalypse
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
 
 =cut
