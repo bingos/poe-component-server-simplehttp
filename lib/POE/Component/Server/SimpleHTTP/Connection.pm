@@ -6,7 +6,8 @@ package POE::Component::Server::SimpleHTTP::Connection;
 use strict;
 use warnings;
 
-use Socket qw( inet_ntoa unpack_sockaddr_in );
+use Socket (qw( AF_INET AF_INET6 AF_UNIX inet_ntop sockaddr_family
+   unpack_sockaddr_in unpack_sockaddr_in6 unpack_sockaddr_un ));
 use POE;
 
 use Moose;
@@ -69,13 +70,14 @@ sub BUILDARGS {
    my $socket = shift;
 
    eval {
-      ( $self->{'remote_port'}, $self->{'remote_addr'} ) =
-        unpack_sockaddr_in( getpeername($socket) );
-      $self->{'remote_ip'} = inet_ntoa( $self->{'remote_addr'} );
+      my $family;
+      ( $family, $self->{'remote_port'}, $self->{'remote_addr'},
+         $self->{'remote_ip'}
+      ) = $class->get_sockaddr_info( getpeername($socket) );
 
-      ( $self->{'local_port'}, $self->{'local_addr'} ) =
-        unpack_sockaddr_in( getsockname($socket) );
-      $self->{'local_ip'} = inet_ntoa( $self->{'local_addr'} );
+      ( $family, $self->{'local_port'}, $self->{'local_addr'},
+         $self->{'local_ip'}
+      ) = $class->get_sockaddr_info( getsockname($socket) );
    };
 
    if ($@) {
@@ -103,6 +105,29 @@ sub DEMOLISH {
       $poe_kernel->call( $sessionID, @$data );
       $poe_kernel->refcount_decrement( $sessionID, __PACKAGE__ );
    }
+}
+
+sub get_sockaddr_info {
+   my $class = shift;
+   my $sockaddr = shift;
+
+   my $family = sockaddr_family( $sockaddr );
+   my ( $port, $address, $straddress );
+   if ( $family == AF_INET ) {
+      ( $port, $address ) = unpack_sockaddr_in( $sockaddr );
+      $straddress = inet_ntop( $family, $address );
+   } elsif ( $family == AF_INET6 ) {
+      ( $port, $address ) = unpack_sockaddr_in6( $sockaddr );
+      $straddress = inet_ntop( $family, $address );
+   } elsif ( $family == AF_UNIX ) {
+      $address = unpack_sockaddr_un( $sockaddr );
+      $straddress = $address // '<local>';
+      $port = undef;
+   } else {
+      $address = $port = undef;
+      $straddress = '<unknown>';
+   }
+   return ( $family, $address, $port, $straddress );
 }
 
 no Moose;
@@ -134,11 +159,11 @@ __PACKAGE__->meta->make_immutable;
 
 	my $connection = POE::Component::Server::SimpleHTTP::Connection->new( $socket );
 
-	$connection->remote_ip();	# Returns remote ip in dotted quad format ( 1.1.1.1 )
+	$connection->remote_ip();	# Returns remote address as a string ( 1.1.1.1 or 2000::1 )
 	$connection->remote_port();	# Returns remote port
 	$connection->remote_addr();	# Returns true remote address, consult the L<Socket> POD
 	$connection->local_addr();	# Returns true local address, same as above
-	$connection->local_ip();	# Returns local ip in dotted quad format ( 1.1.1.1 )
+	$connection->local_ip();	# Returns remote address as a string ( 1.1.1.1 or 2000::1 )
 	$connection->local_port();	# Returns local port
 	$connection->dead();		# Returns a boolean value whether the socket is closed or not
 	$connection->ssl();		# Returns a boolean value whether the socket is SSLified or not
