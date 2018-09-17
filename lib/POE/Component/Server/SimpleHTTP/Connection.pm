@@ -139,7 +139,7 @@ __PACKAGE__->meta->make_immutable;
 
 =pod
 
-=for Pod::Coverage DEMOLISH
+=for Pod::Coverage DEMOLISH get_sockaddr_info
 
 =cut
 
